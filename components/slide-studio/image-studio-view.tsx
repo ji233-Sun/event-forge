@@ -24,8 +24,7 @@ interface ImageStudioViewProps {
 export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  const doneSlides = slides.filter((s) => s.status === 'done')
-
+  const doneSlides = slides.filter((s) => s.status === 'done' && s.url)
   const currentSlide = slides[currentIndex]
 
   const goToPrev = useCallback(() => {
@@ -45,17 +44,23 @@ export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProp
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [goToPrev, goToNext])
 
-  function handleDownloadAll() {
-    doneSlides.forEach((slide) => {
-      if (!slide.base64 || !slide.mediaType) return
-      const ext = slide.mediaType.split('/')[1] ?? 'png'
-      const a = document.createElement('a')
-      a.href = `data:${slide.mediaType};base64,${slide.base64}`
-      a.download = `slide-${slide.index + 1}.${ext}`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-    })
+  async function downloadSlide(slide: ImageSlideState & { url: string }) {
+    const res = await fetch(slide.url)
+    const blob = await res.blob()
+    const ext = blob.type.split('/')[1] ?? 'png'
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `slide-${slide.index + 1}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(a.href)
+  }
+
+  async function handleDownloadAll() {
+    for (const slide of doneSlides) {
+      if (slide.url) await downloadSlide(slide as ImageSlideState & { url: string })
+    }
   }
 
   return (
@@ -81,15 +86,9 @@ export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProp
           <Button
             variant="outline"
             size="sm"
-            disabled={!currentSlide?.base64}
+            disabled={!currentSlide?.url}
             onClick={() => {
-              if (currentSlide?.base64 && currentSlide.mediaType) {
-                const w = window.open('', '_blank')
-                w?.document.write(
-                  `<img src="data:${currentSlide.mediaType};base64,${currentSlide.base64}" style="width:100%;height:100%;object-fit:contain;background:#000">`,
-                )
-                w?.document.close()
-              }
+              if (currentSlide?.url) window.open(currentSlide.url, '_blank')
             }}
           >
             <IconPresentation className="mr-1 size-4" />
@@ -100,7 +99,7 @@ export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProp
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Image-mode thumbnail strip */}
+        {/* Thumbnail strip */}
         <aside className="w-40 shrink-0 overflow-y-auto border-r">
           <div className="flex flex-col gap-2 px-2 py-3">
             {slides.map((slide, i) => (
@@ -116,9 +115,9 @@ export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProp
                       : 'border-border hover:border-border/80',
                   ].join(' ')}
                 >
-                  {slide.status === 'done' && slide.base64 ? (
+                  {slide.status === 'done' && slide.url ? (
                     <img
-                      src={`data:${slide.mediaType};base64,${slide.base64}`}
+                      src={slide.url}
                       alt={slide.title || `Slide ${i + 1}`}
                       className="aspect-video w-full object-cover"
                     />
@@ -157,9 +156,9 @@ export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProp
 
         {/* Image viewer */}
         <main className="relative flex flex-1 items-center justify-center overflow-hidden bg-black">
-          {currentSlide?.status === 'done' && currentSlide.base64 ? (
+          {currentSlide?.status === 'done' && currentSlide.url ? (
             <img
-              src={`data:${currentSlide.mediaType};base64,${currentSlide.base64}`}
+              src={currentSlide.url}
               alt={currentSlide.title}
               className="max-h-full max-w-full object-contain"
             />

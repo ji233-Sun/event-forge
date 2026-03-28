@@ -146,31 +146,33 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     }))
     setImageSlideStates(initialStates)
 
-    // Phase 2: parallel image generation
-    const results = await Promise.all(
-      planSlides.map(async (s) => {
-        try {
-          const res = await fetch('/api/generate-slide-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imagePrompt: s.imagePrompt, slideIndex: s.index }),
-          })
-          if (!res.ok) throw new Error('Image generation failed')
-          const img = await res.json() as { index: number; base64: string; mediaType: string }
-          const done: ImageSlideState = { ...s, status: 'done', base64: img.base64, mediaType: img.mediaType }
-          setImageSlideStates((prev) =>
-            prev.map((st) => (st.index === s.index ? done : st)),
-          )
-          return done
-        } catch {
-          const failed: ImageSlideState = { ...s, status: 'failed' }
-          setImageSlideStates((prev) =>
-            prev.map((st) => (st.index === s.index ? failed : st)),
-          )
-          return failed
-        }
-      }),
-    )
+    // Phase 2: sequential image generation (one at a time)
+    const results: ImageSlideState[] = []
+    for (const s of planSlides) {
+      setImageSlideStates((prev) =>
+        prev.map((st) => (st.index === s.index ? { ...st, status: 'generating' as const } : st)),
+      )
+      try {
+        const res = await fetch('/api/generate-slide-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imagePrompt: s.imagePrompt, slideIndex: s.index }),
+        })
+        if (!res.ok) throw new Error('Image generation failed')
+        const img = await res.json() as { index: number; url: string }
+        const done: ImageSlideState = { ...s, status: 'done', url: img.url }
+        setImageSlideStates((prev) =>
+          prev.map((st) => (st.index === s.index ? done : st)),
+        )
+        results.push(done)
+      } catch {
+        const failed: ImageSlideState = { ...s, status: 'failed' }
+        setImageSlideStates((prev) =>
+          prev.map((st) => (st.index === s.index ? failed : st)),
+        )
+        results.push(failed)
+      }
+    }
 
     const hasAnySuccess = results.some((r) => r.status === 'done')
     if (!hasAnySuccess) {
@@ -181,15 +183,14 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
 
     // Save to DB
     const doneSlides = results
-      .filter((r): r is ImageSlideState & { status: 'done'; base64: string; mediaType: string } =>
-        r.status === 'done' && !!r.base64,
+      .filter((r): r is ImageSlideState & { status: 'done'; url: string } =>
+        r.status === 'done' && !!r.url,
       )
       .map((r): ImageSlide => ({
         index: r.index,
         title: r.title,
         imagePrompt: r.imagePrompt,
-        base64: r.base64,
-        mediaType: r.mediaType,
+        url: r.url,
       }))
 
     const title = planSlides[0]?.title ?? 'Untitled Image Deck'
@@ -259,7 +260,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     const slideState = imageSlideStates.find((s) => s.index === index)
     if (!slideState) return
     setImageSlideStates((prev) =>
-      prev.map((s) => (s.index === index ? { ...s, status: 'pending' as const, base64: undefined, mediaType: undefined } : s))
+      prev.map((s) => (s.index === index ? { ...s, status: 'generating' as const, url: undefined } : s))
     )
     try {
       const res = await fetch('/api/generate-slide-image', {
@@ -268,10 +269,10 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         body: JSON.stringify({ imagePrompt: slideState.imagePrompt, slideIndex: index }),
       })
       if (!res.ok) throw new Error('Image generation failed')
-      const img = await res.json() as { index: number; base64: string; mediaType: string }
+      const img = await res.json() as { index: number; url: string }
       setImageSlideStates((prev) =>
         prev.map((s) =>
-          s.index === index ? { ...s, status: 'done' as const, base64: img.base64, mediaType: img.mediaType } : s
+          s.index === index ? { ...s, status: 'done' as const, url: img.url } : s
         )
       )
     } catch {

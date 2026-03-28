@@ -216,8 +216,7 @@ type ImageSlideJsonb = {
   index: number
   title: string
   imagePrompt: string
-  base64: string
-  mediaType: string
+  url: string
 }
 
 export const deck = pgTable(

@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { mockGenerateImage, mockGetSession, mockHeaders } = vi.hoisted(() => ({
+const { mockGenerateImage, mockGetSession, mockHeaders, mockR2Upload } = vi.hoisted(() => ({
   mockGenerateImage: vi.fn(),
   mockGetSession: vi.fn(),
   mockHeaders: vi.fn(),
+  mockR2Upload: vi.fn(),
 }))
 
 vi.mock('@/lib/ai', () => ({ generateImage: mockGenerateImage }))
@@ -14,11 +15,17 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('next/headers', () => ({ headers: mockHeaders }))
 
+vi.mock('@/lib/r2', () => ({
+  r2Upload: mockR2Upload,
+  r2KeyToProxyUrl: (key: string) => `/api/slides/image/${key}`,
+}))
+
 import { POST } from './route'
 
 beforeEach(() => {
   mockGetSession.mockResolvedValue(authedSession)
   mockHeaders.mockResolvedValue(new Headers())
+  mockR2Upload.mockResolvedValue(undefined)
 })
 
 const authedSession = { user: { id: 'user-1' } }
@@ -28,8 +35,10 @@ afterEach(() => {
   mockGenerateImage.mockReset()
   mockGetSession.mockReset()
   mockHeaders.mockReset()
+  mockR2Upload.mockReset()
   mockGetSession.mockResolvedValue(authedSession)
   mockHeaders.mockResolvedValue(new Headers())
+  mockR2Upload.mockResolvedValue(undefined)
 })
 
 describe('POST /api/generate-slide-image', () => {
@@ -66,7 +75,7 @@ describe('POST /api/generate-slide-image', () => {
     await expect(res.json()).resolves.toEqual({ error: 'slideIndex is required' })
   })
 
-  it('returns image data on success', async () => {
+  it('uploads to R2 and returns proxy URL on success', async () => {
     mockGenerateImage.mockResolvedValueOnce({ images: [fakeImage] })
     const req = new Request('http://localhost/api/generate-slide-image', {
       method: 'POST',
@@ -75,8 +84,10 @@ describe('POST /api/generate-slide-image', () => {
     })
     const res = await POST(req)
     expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body).toEqual({ index: 2, base64: 'abc123', mediaType: 'image/png' })
+    const body = await res.json() as { index: number; url: string }
+    expect(body.index).toBe(2)
+    expect(body.url).toMatch(/^\/api\/slides\/image\/slides\/user-1\/.+\.png$/)
+    expect(mockR2Upload).toHaveBeenCalledOnce()
     expect(mockGenerateImage).toHaveBeenCalledWith('A blue slide', { size: '1920*1080' })
   })
 

@@ -2,6 +2,7 @@ import { generateImage } from '@/lib/ai'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 import { isPlainObject } from '@/lib/api-utils'
+import { r2Upload, r2KeyToProxyUrl } from '@/lib/r2'
 
 export async function POST(req: Request) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -43,10 +44,15 @@ export async function POST(req: Request) {
       return Response.json({ error: 'Image generation returned no images' }, { status: 502 })
     }
 
+    // Upload to R2; key encodes userId for auth verification in the proxy route
+    const ext = image.mediaType.split('/')[1] ?? 'png'
+    const key = `slides/${session.user.id}/${crypto.randomUUID()}.${ext}`
+    const buffer = Buffer.from(image.base64, 'base64')
+    await r2Upload(key, buffer, image.mediaType)
+
     return Response.json({
       index: slideIndex,
-      base64: image.base64,
-      mediaType: image.mediaType,
+      url: r2KeyToProxyUrl(key),
     })
   } catch (error) {
     console.error('[generate-slide-image] failed:', error)

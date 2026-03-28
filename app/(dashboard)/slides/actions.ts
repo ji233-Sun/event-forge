@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { deck } from '@/lib/db/auth-schema'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
+import { proxyUrlToR2Key, r2DeleteMany } from '@/lib/r2'
 
 async function requireAuth() {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -18,8 +19,7 @@ export type ImageSlide = {
   index: number
   title: string
   imagePrompt: string
-  base64: string
-  mediaType: string
+  url: string
 }
 
 export type DeckSummary = {
@@ -96,8 +96,20 @@ export async function updateDeckMarkdown(deckId: string, markdown: string): Prom
 
 export async function deleteDeck(deckId: string): Promise<void> {
   const user = await requireAuth()
-  const [row] = await db.select({ userId: deck.userId }).from(deck).where(eq(deck.id, deckId))
+  const [row] = await db
+    .select({ userId: deck.userId, images: deck.images })
+    .from(deck)
+    .where(eq(deck.id, deckId))
   if (!row || row.userId !== user.id) throw new Error('Deck not found')
+
+  // Clean up R2 objects for image-mode decks
+  if (row.images && row.images.length > 0) {
+    const keys = row.images
+      .map((img) => proxyUrlToR2Key(img.url))
+      .filter((k): k is string => k !== null)
+    await r2DeleteMany(keys)
+  }
+
   await db.delete(deck).where(eq(deck.id, deckId))
 }
 
