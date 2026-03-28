@@ -52,7 +52,7 @@ export async function POST(req: Request) {
   let updatedMarkdown: string;
 
   if (scope === "current") {
-    if (typeof currentSlideIndex !== "number") {
+    if (typeof currentSlideIndex !== "number" || !Number.isInteger(currentSlideIndex)) {
       return Response.json(
         { error: "currentSlideIndex is required when scope is 'current'" },
         { status: 400 }
@@ -82,11 +82,21 @@ export async function POST(req: Request) {
       }
     }
 
-    const { text, finishReason } = await generate(
-      "medium",
-      `按照以下指令修改这一页幻灯片，只返回修改后的幻灯片 Markdown，不要任何说明：\n\n当前幻灯片内容：\n\n${slideContent}\n\n修改指令：${instruction}`,
-      { system: SINGLE_SLIDE_SYSTEM }
-    );
+    let text: string;
+    let finishReason: string | undefined;
+    try {
+      ({ text, finishReason } = await generate(
+        "medium",
+        `按照以下指令修改这一页幻灯片，只返回修改后的幻灯片 Markdown，不要任何说明：\n\n当前幻灯片内容：\n\n${slideContent}\n\n修改指令：${instruction}`,
+        { system: SINGLE_SLIDE_SYSTEM }
+      ));
+    } catch (error) {
+      console.error("[edit-slides] single-slide generation failed:", error);
+      return Response.json(
+        { error: "AI generation failed. Try again." },
+        { status: 502 }
+      );
+    }
 
     if (String(finishReason) === "length") {
       return Response.json(
@@ -102,11 +112,21 @@ export async function POST(req: Request) {
     updatedMarkdown = joinSlides(segments);
   } else {
     // scope = 'all': re-generate the entire deck with the instruction applied
-    const { text, finishReason } = await generate(
-      "medium",
-      `以下是当前演示文稿的 Marp Markdown，请按照修改指令对整个演示文稿进行修改，返回完整的 Marp Markdown：\n\n${markdown}\n\n修改指令：${instruction}`,
-      { maxOutputTokens: 10000, system: SINGLE_SLIDE_SYSTEM }
-    );
+    let text: string;
+    let finishReason: string | undefined;
+    try {
+      ({ text, finishReason } = await generate(
+        "medium",
+        `以下是当前演示文稿的 Marp Markdown，请按照修改指令对整个演示文稿进行修改，返回完整的 Marp Markdown：\n\n${markdown}\n\n修改指令：${instruction}`,
+        { maxOutputTokens: 10000, system: SINGLE_SLIDE_SYSTEM }
+      ));
+    } catch (error) {
+      console.error("[edit-slides] full-deck generation failed:", error);
+      return Response.json(
+        { error: "AI generation failed. Try again." },
+        { status: 502 }
+      );
+    }
 
     if (String(finishReason) === "length") {
       return Response.json(

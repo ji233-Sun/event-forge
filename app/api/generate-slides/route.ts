@@ -2,7 +2,7 @@ import Marp from "@marp-team/marp-core";
 import { generate } from "@/lib/ai";
 
 function extractMarkdown(text: string): string {
-  const mdCodeBlockMatch = text.match(/```(?:markdown|md)\s*([\s\S]*?)```/i);
+  const mdCodeBlockMatch = text.match(/```(?:markdown|md)?\s*([\s\S]*?)```/i);
   if (mdCodeBlockMatch) {
     return mdCodeBlockMatch[1].trim();
   }
@@ -21,10 +21,12 @@ function countMarpSlides(markdown: string): number {
   return 1 + (separators?.length ?? 0);
 }
 
-const BASE_SYSTEM_PROMPT = `你是一位顶级路演设计师 + 信息可视化设计师。请基于用户输入生成一份 Marp 格式的 Markdown 演示文稿，风格要"科技、立体、有空间层次"，避免模板化和大段单调项目符号。
+function buildBaseSystemPrompt(language: string): string {
+  return `你是一位顶级路演设计师 + 信息可视化设计师。请基于用户输入生成一份 Marp 格式的 Markdown 演示文稿，风格要"科技、立体、有空间层次"，避免模板化和大段单调项目符号。
 
 必须严格遵守：
 - 输出必须是纯 Marp Markdown，不要解释，不要额外文字
+- Content language: ${language}
 - 使用 Marp 的 front-matter 指令控制主题和样式
 - 使用 --- 分隔每一页幻灯片
 
@@ -138,7 +140,7 @@ Marp 指令规范：
 - 封面页标题不超过 15 个字
 
 内容与文案规范：
-- 内容使用中文
+- 所有幻灯片文案必须使用 ${language}
 - 涉及金额/规模等单位使用中文单位（亿、万），不要用 B/M/K
 - 文案精炼，适合演示场景
 
@@ -175,14 +177,16 @@ ECharts 图表规范（必须使用）：
 <div id="chart-4" class="echarts-chart" data-option='柱状图JSON'></div>
 <div id="chart-5" class="echarts-chart" data-option='饼图JSON'></div>
 </div>`;
+}
 
 async function generateMarpMarkdown(
   prompt: string,
+  language: string,
   extraConstraint?: string
 ): Promise<{ text: string; finishReason: string }> {
   const { text, finishReason } = await generate("medium", prompt, {
     maxOutputTokens: 10000,
-    system: [BASE_SYSTEM_PROMPT, extraConstraint].filter(Boolean).join("\n\n"),
+    system: [buildBaseSystemPrompt(language), extraConstraint].filter(Boolean).join("\n\n"),
   });
 
   return {
@@ -198,39 +202,23 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { prompt } = body as { prompt?: string };
+  const { prompt, language } = body as { prompt?: string; language?: string };
 
   if (!prompt || typeof prompt !== "string") {
     return Response.json({ error: "prompt is required" }, { status: 400 });
   }
 
-  const basePrompt = `请根据以下活动描述，生成一份 Marp Markdown 格式的演示文稿：\n\n${prompt}`;
+  const outputLanguage =
+    typeof language === "string" && language.trim() ? language.trim() : "English";
+  const basePrompt = `Create a Marp Markdown slide deck in ${outputLanguage} based on the following event description:\n\n${prompt}`;
 
-  const { text, finishReason } = await generateMarpMarkdown(basePrompt);
+  let markdown: string;
+  let slideCount: number;
 
-  if (finishReason === "length") {
-    return Response.json(
-      {
-        error:
-          "Model output was truncated due to token limit. Please retry with a shorter prompt or fewer slide details.",
-      },
-      { status: 502 }
-    );
-  }
+  try {
+    const { text, finishReason } = await generateMarpMarkdown(basePrompt, outputLanguage);
 
-  let markdown = extractMarkdown(text);
-  let slideCount = countMarpSlides(markdown);
-
-  if (slideCount < 4) {
-    const retry = await generateMarpMarkdown(
-      basePrompt,
-      `硬性要求：
-- 必须输出至少 6 页幻灯片
-- front-matter 后至少出现 5 个页面分隔符（---）
-- 严禁输出单页内容；如果内容不足，请自行补充目录页、方案页、预算页、时间线页、总结页`
-    );
-
-    if (retry.finishReason === "length") {
+    if (finishReason === "length") {
       return Response.json(
         {
           error:
@@ -240,8 +228,38 @@ export async function POST(req: Request) {
       );
     }
 
-    markdown = extractMarkdown(retry.text);
+    markdown = extractMarkdown(text);
     slideCount = countMarpSlides(markdown);
+
+    if (slideCount < 6) {
+      const retry = await generateMarpMarkdown(
+        basePrompt,
+        outputLanguage,
+        `硬性要求：
+- 必须输出至少 6 页幻灯片
+- front-matter 后至少出现 5 个页面分隔符（---）
+- 严禁输出单页内容；如果内容不足，请自行补充目录页、方案页、预算页、时间线页、总结页`
+      );
+
+      if (retry.finishReason === "length") {
+        return Response.json(
+          {
+            error:
+              "Model output was truncated due to token limit. Please retry with a shorter prompt or fewer slide details.",
+          },
+          { status: 502 }
+        );
+      }
+
+      markdown = extractMarkdown(retry.text);
+      slideCount = countMarpSlides(markdown);
+    }
+  } catch (error) {
+    console.error("[generate-slides] generation failed:", error);
+    return Response.json(
+      { error: "AI generation failed. Try again." },
+      { status: 502 }
+    );
   }
 
   if (!markdown) {
@@ -251,11 +269,11 @@ export async function POST(req: Request) {
     );
   }
 
-  if (slideCount < 4) {
+  if (slideCount < 6) {
     return Response.json(
       {
         error:
-          "Failed to generate multi-slide markdown. Please retry with more detailed event information.",
+          "Failed to generate a 6-slide minimum deck. Please retry with more detailed event information.",
       },
       { status: 502 }
     );
@@ -264,9 +282,19 @@ export async function POST(req: Request) {
   console.log("[generate-slides] generated markdown length:", markdown.length);
   console.log("[generate-slides] markdown slide count:", slideCount);
 
-  // Server-side rendering with Marp Core
-  const marp = new Marp({ html: true });
-  const { html, css } = marp.render(markdown);
+  let html: string;
+  let css: string;
+  try {
+    // Server-side rendering with Marp Core
+    const marp = new Marp({ html: true });
+    ({ html, css } = marp.render(markdown));
+  } catch (error) {
+    console.error("[generate-slides] render failed:", error);
+    return Response.json(
+      { error: "Failed to render generated slides. Try again." },
+      { status: 502 }
+    );
+  }
 
   console.log("[generate-slides] rendered slides, html length:", html.length);
 

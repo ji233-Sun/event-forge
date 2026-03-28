@@ -21,7 +21,12 @@ vi.mock("@marp-team/marp-core", () => ({
 import { POST } from "./route";
 
 afterEach(() => {
-  vi.clearAllMocks();
+  mockGenerate.mockReset();
+  mockRender.mockReset();
+  mockRender.mockImplementation(() => ({
+    html: "<section>Rendered</section>",
+    css: "section { color: red; }",
+  }));
 });
 
 describe("POST /api/edit-slides", () => {
@@ -84,5 +89,68 @@ describe("POST /api/edit-slides", () => {
     expect(payload.markdown).toMatch(/^---\r\nmarp: true\r\ntheme: default\r\n---/);
     expect(payload.markdown).toContain("# Updated Title");
     expect(payload.markdown).toContain("## Agenda");
+  });
+
+  it("rejects a non-integer currentSlideIndex", async () => {
+    const request = new Request("http://localhost/api/edit-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markdown: "# Slide 1",
+        instruction: "Update the title",
+        scope: "current",
+        currentSlideIndex: 1.5,
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "currentSlideIndex is required when scope is 'current'",
+    });
+  });
+
+  it("returns 502 when single-slide AI editing throws", async () => {
+    mockGenerate.mockRejectedValueOnce(new Error("provider down"));
+
+    const request = new Request("http://localhost/api/edit-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markdown: "# Slide 1",
+        instruction: "Update the title",
+        scope: "current",
+        currentSlideIndex: 0,
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "AI generation failed. Try again.",
+    });
+  });
+
+  it("returns 502 when full-deck AI editing throws", async () => {
+    mockGenerate.mockRejectedValueOnce(new Error("provider down"));
+
+    const request = new Request("http://localhost/api/edit-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markdown: "# Slide 1",
+        instruction: "Update the deck",
+        scope: "all",
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "AI generation failed. Try again.",
+    });
   });
 });
