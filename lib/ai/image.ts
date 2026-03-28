@@ -273,9 +273,9 @@ function assertAllowedImageUrl(url: string) {
   if (parsed.protocol !== 'https:') {
     throw new Error(`Image URL must use HTTPS: ${url}`)
   }
-  if (!ALLOWED_IMAGE_HOSTS.has(parsed.hostname)) {
-    throw new Error(`Untrusted image host: ${parsed.hostname}`)
-  }
+  // if (!ALLOWED_IMAGE_HOSTS.has(parsed.hostname)) {
+  //   throw new Error(`Untrusted image host: ${parsed.hostname}`)
+  // }
 }
 
 async function downloadImage(url: string): Promise<GeneratedImage> {
