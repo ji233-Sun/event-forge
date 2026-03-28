@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { ThumbnailStrip } from '@/components/slide-studio/thumbnail-strip'
 import {
   IconArrowLeft,
   IconPresentation,
@@ -10,23 +9,22 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconPhoto,
+  IconX,
+  IconLoader2,
+  IconRefresh,
 } from '@tabler/icons-react'
 import type { ImageSlideState } from './image-types'
-
-export type { ImageSlideState } from './image-types'
 
 interface ImageStudioViewProps {
   slides: ImageSlideState[]
   onBack: () => void
+  onRetry?: (index: number) => void
 }
 
-export function ImageStudioView({ slides, onBack }: ImageStudioViewProps) {
+export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
   const doneSlides = slides.filter((s) => s.status === 'done')
-  const titles = slides.map((s, i) => s.title || `Slide ${i + 1}`)
-  // ThumbnailStrip needs a string[] for slide segments — pass dummy strings (it ignores content)
-  const dummySegments = slides.map(() => '')
 
   const currentSlide = slides[currentIndex]
 
@@ -102,14 +100,59 @@ export function ImageStudioView({ slides, onBack }: ImageStudioViewProps) {
 
       {/* Body */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Thumbnail strip */}
+        {/* Image-mode thumbnail strip */}
         <aside className="w-40 shrink-0 overflow-y-auto border-r">
-          <ThumbnailStrip
-            slides={dummySegments}
-            activeIndex={currentIndex}
-            onSelect={setCurrentIndex}
-            titles={titles}
-          />
+          <div className="flex flex-col gap-2 px-2 py-3">
+            {slides.map((slide, i) => (
+              <div key={slide.index} className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCurrentIndex(i)}
+                  aria-pressed={i === currentIndex}
+                  className={[
+                    'w-full overflow-hidden rounded-md border transition-colors focus:outline-none focus:ring-2 focus:ring-ring',
+                    i === currentIndex
+                      ? 'border-primary/60 ring-1 ring-primary/40'
+                      : 'border-border hover:border-border/80',
+                  ].join(' ')}
+                >
+                  {slide.status === 'done' && slide.base64 ? (
+                    <img
+                      src={`data:${slide.mediaType};base64,${slide.base64}`}
+                      alt={slide.title || `Slide ${i + 1}`}
+                      className="aspect-video w-full object-cover"
+                    />
+                  ) : slide.status === 'failed' ? (
+                    <div className="flex aspect-video w-full flex-col items-center justify-center gap-1 bg-muted/50 text-muted-foreground">
+                      <IconX className="size-4 text-destructive" />
+                      <span className="text-[9px]">Failed</span>
+                    </div>
+                  ) : (
+                    <div className="flex aspect-video w-full flex-col items-center justify-center gap-1 border-2 border-dashed border-muted-foreground/30 bg-muted/20 text-muted-foreground">
+                      <IconLoader2 className="size-4 animate-spin opacity-50" />
+                    </div>
+                  )}
+                </button>
+
+                <p className="truncate px-0.5 text-[10px] text-muted-foreground">
+                  <span className="opacity-60">{i + 1}. </span>
+                  {slide.title || `Slide ${i + 1}`}
+                </p>
+
+                {slide.status === 'failed' && onRetry && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 w-full text-[10px]"
+                    onClick={() => onRetry(slide.index)}
+                  >
+                    <IconRefresh className="mr-1 size-3" />
+                    Retry
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
         </aside>
 
         {/* Image viewer */}

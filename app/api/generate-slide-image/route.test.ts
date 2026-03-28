@@ -90,4 +90,15 @@ describe('POST /api/generate-slide-image', () => {
     const res = await POST(req)
     expect(res.status).toBe(502)
   })
+
+  it('returns 502 when generateImage returns an empty images array', async () => {
+    mockGenerateImage.mockResolvedValueOnce({ images: [] })
+    const req = new Request('http://localhost/api/generate-slide-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imagePrompt: 'A slide', slideIndex: 1 }),
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(502)
+  })
 })

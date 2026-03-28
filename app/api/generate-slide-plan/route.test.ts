@@ -145,4 +145,28 @@ describe('POST /api/generate-slide-plan', () => {
     const res = await POST(req)
     expect(res.status).toBe(502)
   })
+
+  it('returns 502 when individual slides have missing required fields', async () => {
+    mockGetSession.mockResolvedValue(authedSession)
+    mockGenerate.mockResolvedValueOnce({
+      text: JSON.stringify({
+        slides: [
+          { index: 0, title: 'Cover', imagePrompt: 'A blue slide' },
+          { index: 1, title: 'Overview' /* imagePrompt missing */ },
+          { index: 2, title: 'Stats', imagePrompt: 'Bar chart slide' },
+          { index: 3, title: 'Budget', imagePrompt: 'Budget breakdown' },
+          { index: 4, title: 'Timeline', imagePrompt: 'Timeline slide' },
+          { index: 5, title: 'Close', imagePrompt: 'Closing CTA slide' },
+        ],
+      }),
+      finishReason: 'stop',
+    })
+    const req = new Request('http://localhost/api/generate-slide-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'A festival' }),
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(502)
+  })
 })

@@ -11,9 +11,13 @@ import {
   saveDeck,
   updateDeckMarkdown,
   deleteDeck,
+  getDeck,
   renderMarkdown,
 } from './actions'
-import type { DeckSummary } from './actions'
+import type { DeckSummary, SlideMode, ImageSlide } from './actions'
+import { ImageGeneratingScreen } from '@/components/slide-studio/image-generating-screen'
+import { ImageStudioView } from '@/components/slide-studio/image-studio-view'
+import type { ImageSlideState } from '@/components/slide-studio/image-types'
 import {
   IconSparkles,
   IconLoader2,
@@ -24,7 +28,7 @@ import {
   IconClock,
 } from '@tabler/icons-react'
 
-type Phase = 'input' | 'generating' | 'studio'
+type Phase = 'input' | 'generating' | 'studio' | 'image-generating' | 'image-studio'
 
 interface SlideSession {
   markdown: string
@@ -62,6 +66,10 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const [decks, setDecks] = useState(initialDecks)
   const [loadingDeckId, setLoadingDeckId] = useState<string | null>(null)
 
+  const [slideMode, setSlideMode] = useState<SlideMode>('marp')
+  const [imageSlideStates, setImageSlideStates] = useState<ImageSlideState[]>([])
+  const [imageGenerateError, setImageGenerateError] = useState<string | null>(null)
+
   const previewRef = useRef<SlidePreviewHandle>(null)
 
   // ── Generate ──────────────────────────────────────────────────────────
@@ -98,6 +106,106 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       setGenerateError(e instanceof Error ? e.message : 'Something went wrong')
       setPhase('input')
     }
+  }
+
+  // ── Generate Images ───────────────────────────────────────────────────
+  async function handleGenerateImages() {
+    if (!prompt.trim()) return
+    setImageGenerateError(null)
+    setImageSlideStates([])
+    setPhase('image-generating')
+
+    // Phase 1: get slide plan
+    let planSlides: Array<{ index: number; title: string; imagePrompt: string }>
+    try {
+      const res = await fetch('/api/generate-slide-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      })
+      if (!res.ok) {
+        let message = 'Slide planning failed'
+        try { const err = await res.json() as { error?: string }; message = err.error || message } catch { /* */ }
+        throw new Error(message)
+      }
+      const data = await res.json() as { slides: typeof planSlides }
+      if (!Array.isArray(data.slides) || data.slides.length === 0) {
+        throw new Error('Invalid slide plan: expected a non-empty slides array')
+      }
+      planSlides = data.slides
+    } catch (e) {
+      setImageGenerateError(e instanceof Error ? e.message : 'Something went wrong')
+      setPhase('input')
+      return
+    }
+
+    // Initialize slide states as 'pending'
+    const initialStates: ImageSlideState[] = planSlides.map((s) => ({
+      ...s,
+      status: 'pending',
+    }))
+    setImageSlideStates(initialStates)
+
+    // Phase 2: parallel image generation
+    const results = await Promise.all(
+      planSlides.map(async (s) => {
+        try {
+          const res = await fetch('/api/generate-slide-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ imagePrompt: s.imagePrompt, slideIndex: s.index }),
+          })
+          if (!res.ok) throw new Error('Image generation failed')
+          const img = await res.json() as { index: number; base64: string; mediaType: string }
+          const done: ImageSlideState = { ...s, status: 'done', base64: img.base64, mediaType: img.mediaType }
+          setImageSlideStates((prev) =>
+            prev.map((st) => (st.index === s.index ? done : st)),
+          )
+          return done
+        } catch {
+          const failed: ImageSlideState = { ...s, status: 'failed' }
+          setImageSlideStates((prev) =>
+            prev.map((st) => (st.index === s.index ? failed : st)),
+          )
+          return failed
+        }
+      }),
+    )
+
+    const hasAnySuccess = results.some((r) => r.status === 'done')
+    if (!hasAnySuccess) {
+      setImageGenerateError('All image generations failed. Please try again.')
+      setPhase('input')
+      return
+    }
+
+    // Save to DB
+    const doneSlides = results
+      .filter((r): r is ImageSlideState & { status: 'done'; base64: string; mediaType: string } =>
+        r.status === 'done' && !!r.base64,
+      )
+      .map((r): ImageSlide => ({
+        index: r.index,
+        title: r.title,
+        imagePrompt: r.imagePrompt,
+        base64: r.base64,
+        mediaType: r.mediaType,
+      }))
+
+    const title = planSlides[0]?.title ?? 'Untitled Image Deck'
+    try {
+      const saved = await saveDeck({ title, prompt: prompt.trim(), mode: 'image', images: doneSlides })
+      setDeckId(saved.id)
+      setDecks((prev) => [
+        { id: saved.id, title, prompt: prompt.trim(), mode: 'image', createdAt: new Date() },
+        ...prev,
+      ])
+    } catch {
+      setImageGenerateError('Failed to save deck. Your images were generated but could not be saved.')
+      setPhase('input')
+      return
+    }
+    setPhase('image-studio')
   }
 
   // ── Edit ──────────────────────────────────────────────────────────────
@@ -146,20 +254,59 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     [session, deckId],
   )
 
+  // ── Retry single image slide ──────────────────────────────────────────
+  async function handleRetrySlide(index: number) {
+    const slideState = imageSlideStates.find((s) => s.index === index)
+    if (!slideState) return
+    setImageSlideStates((prev) =>
+      prev.map((s) => (s.index === index ? { ...s, status: 'pending' as const, base64: undefined, mediaType: undefined } : s))
+    )
+    try {
+      const res = await fetch('/api/generate-slide-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imagePrompt: slideState.imagePrompt, slideIndex: index }),
+      })
+      if (!res.ok) throw new Error('Image generation failed')
+      const img = await res.json() as { index: number; base64: string; mediaType: string }
+      setImageSlideStates((prev) =>
+        prev.map((s) =>
+          s.index === index ? { ...s, status: 'done' as const, base64: img.base64, mediaType: img.mediaType } : s
+        )
+      )
+    } catch {
+      setImageSlideStates((prev) =>
+        prev.map((s) => (s.index === index ? { ...s, status: 'failed' as const } : s))
+      )
+    }
+  }
+
   // ── Load from history ─────────────────────────────────────────────────
   async function handleLoadDeck(id: string) {
     setLoadingDeckId(id)
+    setGenerateError(null)
+    setImageGenerateError(null)
     try {
-      const { getDeck } = await import('./actions')
       const d = await getDeck(id)
-      if (!d.markdown) throw new Error('Deck has no markdown')
-      const { html, css } = await renderMarkdown(d.markdown)
-      setDeckId(d.id)
-      setSession({ html, css, markdown: d.markdown })
-      setCurrentSlideIndex(0)
-      setPhase('studio')
+
+      if (d.mode === 'image') {
+        const loaded: ImageSlideState[] = (d.images ?? []).map((img) => ({
+          ...img,
+          status: 'done' as const,
+        }))
+        setImageSlideStates(loaded)
+        setDeckId(d.id)
+        setPhase('image-studio')
+      } else {
+        const { html, css } = await renderMarkdown(d.markdown ?? '')
+        setDeckId(d.id)
+        setSession({ html, css, markdown: d.markdown ?? '' })
+        setCurrentSlideIndex(0)
+        setPhase('studio')
+      }
     } catch (e) {
       console.error('Failed to load deck:', e)
+      setGenerateError(e instanceof Error ? e.message : 'Failed to load deck')
     } finally {
       setLoadingDeckId(null)
     }
@@ -187,6 +334,32 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         <p className="text-lg font-medium">Crafting your slides...</p>
         <p className="text-sm text-muted-foreground">This usually takes 15-30 seconds</p>
       </div>
+    )
+  }
+
+  // ── Render: Image Generating ──────────────────────────────────────────
+  if (phase === 'image-generating') {
+    return (
+      <ImageGeneratingScreen
+        totalSlides={imageSlideStates.length}
+        slideStatuses={imageSlideStates.map((s) => s.status)}
+      />
+    )
+  }
+
+  // ── Render: Image Studio ──────────────────────────────────────────────
+  if (phase === 'image-studio') {
+    return (
+      <ImageStudioView
+        slides={imageSlideStates}
+        onBack={() => {
+          setPhase('input')
+          setImageSlideStates([])
+          setDeckId(null)
+          setImageGenerateError(null)
+        }}
+        onRetry={handleRetrySlide}
+      />
     )
   }
 
@@ -270,6 +443,11 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             {generateError}
           </div>
         )}
+        {imageGenerateError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {imageGenerateError}
+          </div>
+        )}
 
         {/* Input form */}
         <div className="space-y-4">
@@ -279,10 +457,13 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
-          <div className="flex gap-2">
-            <Button onClick={handleGenerate} disabled={!prompt.trim()}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              onClick={slideMode === 'marp' ? handleGenerate : handleGenerateImages}
+              disabled={!prompt.trim()}
+            >
               <IconSparkles className="mr-1 size-4" />
-              Generate Pitch Deck
+              {slideMode === 'marp' ? 'Generate Pitch Deck' : 'Generate Image Deck'}
             </Button>
             <Button
               variant="outline"
@@ -291,6 +472,32 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
               <IconDice className="mr-1 size-4" />
               Random Prompt
             </Button>
+            <div className="ml-auto flex overflow-hidden rounded-md border text-xs">
+              <button
+                type="button"
+                onClick={() => setSlideMode('marp')}
+                className={[
+                  'px-3 py-1.5 font-medium transition-colors',
+                  slideMode === 'marp'
+                    ? 'bg-foreground text-background'
+                    : 'bg-background text-muted-foreground hover:bg-muted',
+                ].join(' ')}
+              >
+                Marp
+              </button>
+              <button
+                type="button"
+                onClick={() => setSlideMode('image')}
+                className={[
+                  'px-3 py-1.5 font-medium transition-colors',
+                  slideMode === 'image'
+                    ? 'bg-foreground text-background'
+                    : 'bg-background text-muted-foreground hover:bg-muted',
+                ].join(' ')}
+              >
+                Image
+              </button>
+            </div>
           </div>
         </div>
 
@@ -314,7 +521,12 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
                       <IconPresentation size={18} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{d.title}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="truncate text-sm font-medium">{d.title}</p>
+                        <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {d.mode === 'image' ? 'Image' : 'Marp'}
+                        </span>
+                      </div>
                       <p className="truncate text-xs text-muted-foreground">
                         {new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(d.createdAt))}
                         {' · '}
