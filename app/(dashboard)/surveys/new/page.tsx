@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { IconArrowLeft, IconLoader2 } from '@tabler/icons-react'
+import { IconLoader2 } from '@tabler/icons-react'
 import Link from 'next/link'
 
 export default function NewSurveyPage() {
@@ -37,16 +37,8 @@ export default function NewSurveyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-2xl px-4 py-8 md:px-6">
-        <Link
-          href="/surveys"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <IconArrowLeft size={16} />
-          Back to Surveys
-        </Link>
-
+    <div className="p-6 md:p-8">
+      <div className="mx-auto max-w-2xl">
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle className="text-2xl font-bold tracking-tight">Create New Survey</CardTitle>

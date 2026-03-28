@@ -1,12 +1,10 @@
 import { getSurveyDetail } from '../actions'
 import { notFound } from 'next/navigation'
-import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
-  IconArrowLeft,
   IconExternalLink,
   IconUsers,
   IconClipboardList,
@@ -32,17 +30,8 @@ export default async function SurveyDetailPage({
   const publicUrl = data.slug ? `/s/${data.slug}` : `/s/${data.id}`
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-5xl px-4 py-8 md:px-6">
-        <Link
-          href="/surveys"
-          className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <IconArrowLeft size={16} />
-          Back to Surveys
-        </Link>
-
-        {/* Header */}
+    <div className="p-6 md:p-8">
+      {/* Header */}
         <div className="mb-6 flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -136,7 +125,6 @@ export default async function SurveyDetailPage({
             />
           </TabsContent>
         </Tabs>
-      </div>
     </div>
   )
 }

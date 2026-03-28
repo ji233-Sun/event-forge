@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { getSurveyForFill } from '@/app/surveys/actions'
+import { getSurveyForFill } from '@/app/(dashboard)/surveys/actions'
 import { PublicSurveyForm } from './public-survey-form'
 
 export default async function PublicSurveyPage({

@@ -10,7 +10,6 @@ import { CopyLinkButton } from '../components/copy-link-button'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  IconArrowLeft,
   IconLoader2,
   IconPlus,
   IconDeviceFloppy,
@@ -126,16 +125,8 @@ export function SurveyEditorClient({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-6xl px-4 py-8 md:px-6">
+    <div className="p-6 md:p-8">
         <div className="mb-6">
-          <Link
-            href="/surveys"
-            className="mb-4 inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <IconArrowLeft size={16} />
-            Back to Surveys
-          </Link>
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
@@ -250,7 +241,6 @@ export function SurveyEditorClient({
             </div>
           </div>
         </div>
-      </div>
     </div>
   )
 }

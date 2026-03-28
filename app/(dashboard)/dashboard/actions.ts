@@ -105,14 +105,14 @@ export async function getDashboardData() {
 
   const trendRows = await db
     .select({
-      date: sql<string>`DATE(${response.createdAt})`.as('date'),
+      date: sql<string>`${response.createdAt}::date`.as('date'),
       count: count(),
     })
     .from(response)
     .innerJoin(survey, eq(response.surveyId, survey.id))
-    .where(and(eq(survey.userId, user.id), sql`${response.createdAt} >= ${sevenDaysAgo}`))
-    .groupBy(sql`DATE(${response.createdAt})`)
-    .orderBy(sql`DATE(${response.createdAt})`)
+    .where(and(eq(survey.userId, user.id), sql`${response.createdAt} >= ${sevenDaysAgo.toISOString()}::timestamptz`))
+    .groupBy(sql`${response.createdAt}::date`)
+    .orderBy(sql`${response.createdAt}::date`)
 
   // Fill missing days with 0
   const trendMap = new Map(trendRows.map((r) => [r.date, r.count]))
