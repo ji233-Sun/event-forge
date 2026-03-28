@@ -69,6 +69,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const [slideMode, setSlideMode] = useState<SlideMode>('marp')
   const [imageSlideStates, setImageSlideStates] = useState<ImageSlideState[]>([])
   const [imageGenerateError, setImageGenerateError] = useState<string | null>(null)
+  const [imageDeckTitle, setImageDeckTitle] = useState<string>('Slide Deck')
 
   const previewRef = useRef<SlidePreviewHandle>(null)
 
@@ -194,6 +195,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       }))
 
     const title = planSlides[0]?.title ?? 'Untitled Image Deck'
+    setImageDeckTitle(title)
     try {
       const saved = await saveDeck({ title, prompt: prompt.trim(), mode: 'image', images: doneSlides })
       setDeckId(saved.id)
@@ -296,6 +298,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           status: 'done' as const,
         }))
         setImageSlideStates(loaded)
+        setImageDeckTitle(d.title)
         setDeckId(d.id)
         setPhase('image-studio')
       } else {
@@ -353,6 +356,8 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     return (
       <ImageStudioView
         slides={imageSlideStates}
+        deckId={deckId ?? undefined}
+        deckTitle={imageDeckTitle}
         onBack={() => {
           setPhase('input')
           setImageSlideStates([])

@@ -57,6 +57,28 @@ export async function r2Upload(
 }
 
 /**
+ * Download a full object from R2 into a Buffer (for server-side processing).
+ * Returns null if the object does not exist or an error occurs.
+ */
+export async function r2GetBuffer(
+  key: string,
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  try {
+    const res = await getClient().send(
+      new GetObjectCommand({ Bucket: getBucket(), Key: key }),
+    )
+    if (!res.Body) return null
+    const bytes = await res.Body.transformToByteArray()
+    return {
+      buffer: Buffer.from(bytes),
+      contentType: res.ContentType ?? 'application/octet-stream',
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
  * Stream an object from R2.
  * Returns null if the object does not exist or an error occurs.
  */

@@ -1,31 +1,55 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   IconArrowLeft,
   IconPresentation,
   IconDownload,
   IconChevronLeft,
   IconChevronRight,
+  IconChevronDown,
   IconPhoto,
   IconX,
   IconLoader2,
   IconRefresh,
+  IconFileTypePdf,
+  IconPresentation as IconPptx,
 } from '@tabler/icons-react'
 import type { ImageSlideState } from './image-types'
+import { exportToPdf, exportToPptx } from '@/lib/export/slides'
 
 interface ImageStudioViewProps {
   slides: ImageSlideState[]
+  deckId?: string
+  deckTitle?: string
   onBack: () => void
   onRetry?: (index: number) => void
 }
 
-export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProps) {
-  const [currentIndex, setCurrentIndex] = useState(0)
+type ExportState = 'idle' | 'exporting'
 
-  const doneSlides = slides.filter((s) => s.status === 'done' && s.url)
+export function ImageStudioView({ slides, deckId, deckTitle = 'Slide Deck', onBack, onRetry }: ImageStudioViewProps) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [isPresenting, setIsPresenting] = useState(false)
+  const [exportState, setExportState] = useState<ExportState>('idle')
+  const presentRef = useRef<HTMLDivElement>(null)
+
+  const doneSlides = slides.filter((s): s is ImageSlideState & { url: string } =>
+    s.status === 'done' && !!s.url
+  )
   const currentSlide = slides[currentIndex]
+
+  useEffect(() => {
+    setCurrentIndex((i) => Math.min(i, Math.max(0, slides.length - 1)))
+  }, [slides.length])
 
   const goToPrev = useCallback(() => {
     setCurrentIndex((i) => Math.max(0, i - 1))
@@ -36,32 +60,62 @@ export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProp
   }, [slides.length])
 
   useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
+    function onKey(e: KeyboardEvent) {
       if (e.key === 'ArrowLeft') goToPrev()
-      if (e.key === 'ArrowRight') goToNext()
+      if (e.key === 'ArrowRight' || e.key === ' ') goToNext()
+      if (e.key === 'Escape' && isPresenting) exitPresent()
     }
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [goToPrev, goToNext])
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [goToPrev, goToNext, isPresenting])
 
-  async function downloadSlide(slide: ImageSlideState & { url: string }) {
-    const res = await fetch(slide.url)
+  useEffect(() => {
+    function onFullscreenChange() {
+      if (!document.fullscreenElement) setIsPresenting(false)
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
+  }, [])
+
+  function startPresent() {
+    presentRef.current?.requestFullscreen().catch(() => {})
+    setIsPresenting(true)
+  }
+
+  function exitPresent() {
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {})
+    setIsPresenting(false)
+  }
+
+  async function handleExport(format: 'pdf' | 'pptx') {
+    if (!deckId || doneSlides.length === 0 || exportState === 'exporting') return
+    setExportState('exporting')
+    try {
+      if (format === 'pdf') {
+        await exportToPdf(deckId, deckTitle)
+      } else {
+        await exportToPptx(deckId, deckTitle)
+      }
+    } finally {
+      setExportState('idle')
+    }
+  }
+
+  async function handleDownloadCurrent() {
+    if (!currentSlide?.url) return
+    const res = await fetch(currentSlide.url)
     const blob = await res.blob()
     const ext = blob.type.split('/')[1] ?? 'png'
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `slide-${slide.index + 1}.${ext}`
+    a.download = `slide-${currentSlide.index + 1}.${ext}`
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(a.href)
   }
 
-  async function handleDownloadAll() {
-    for (const slide of doneSlides) {
-      if (slide.url) await downloadSlide(slide as ImageSlideState & { url: string })
-    }
-  }
+  const isExporting = exportState === 'exporting'
 
   return (
     <div className="flex h-[calc(100vh-3rem)] flex-col overflow-hidden">
@@ -77,19 +131,76 @@ export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProp
         </span>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-muted-foreground">{slides.length} slides</span>
-          {doneSlides.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handleDownloadAll}>
+
+          {/* Download current slide */}
+          {currentSlide?.status === 'done' && currentSlide.url && (
+            <Button variant="ghost" size="sm" onClick={handleDownloadCurrent}>
               <IconDownload className="mr-1 size-4" />
-              Download All
+              Save
             </Button>
           )}
+
+          {/* Export dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!deckId || doneSlides.length === 0 || isExporting}
+              >
+                {isExporting ? (
+                  <IconLoader2 className="mr-1 size-4 animate-spin" />
+                ) : (
+                  <IconDownload className="mr-1 size-4" />
+                )}
+                {isExporting ? 'Exporting...' : 'Export'}
+                <IconChevronDown className="ml-1 size-3 opacity-60" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuItem
+                onClick={() => handleExport('pdf')}
+                disabled={isExporting}
+              >
+                <IconFileTypePdf className="mr-2 size-4 text-red-500" />
+                Export as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleExport('pptx')}
+                disabled={isExporting}
+              >
+                <IconPptx className="mr-2 size-4 text-orange-500" />
+                Export as PPTX
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={async () => {
+                  for (const s of doneSlides.sort((a, b) => a.index - b.index)) {
+                    const res = await fetch(s.url)
+                    const blob = await res.blob()
+                    const ext = blob.type.split('/')[1] ?? 'png'
+                    const a = document.createElement('a')
+                    a.href = URL.createObjectURL(blob)
+                    a.download = `slide-${s.index + 1}.${ext}`
+                    document.body.appendChild(a)
+                    a.click()
+                    document.body.removeChild(a)
+                    URL.revokeObjectURL(a.href)
+                  }
+                }}
+                disabled={isExporting}
+              >
+                <IconDownload className="mr-2 size-4" />
+                Download Images
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <Button
             variant="outline"
             size="sm"
-            disabled={!currentSlide?.url}
-            onClick={() => {
-              if (currentSlide?.url) window.open(currentSlide.url, '_blank')
-            }}
+            disabled={doneSlides.length === 0}
+            onClick={startPresent}
           >
             <IconPresentation className="mr-1 size-4" />
             Present
@@ -171,32 +282,85 @@ export function ImageStudioView({ slides, onBack, onRetry }: ImageStudioViewProp
             </div>
           )}
 
-          {/* Navigation arrows */}
-          {currentIndex > 0 && (
-            <button
-              onClick={goToPrev}
-              className="absolute left-3 top-1/2 -translate-y-1/2 rounded-md bg-white/10 p-2 text-white hover:bg-white/20"
-              aria-label="Previous slide"
-            >
-              <IconChevronLeft className="size-5" />
-            </button>
-          )}
-          {currentIndex < slides.length - 1 && (
-            <button
-              onClick={goToNext}
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md bg-white/10 p-2 text-white hover:bg-white/20"
-              aria-label="Next slide"
-            >
-              <IconChevronRight className="size-5" />
-            </button>
-          )}
+          <NavArrows
+            showPrev={currentIndex > 0}
+            showNext={currentIndex < slides.length - 1}
+            onPrev={goToPrev}
+            onNext={goToNext}
+          />
 
-          {/* Slide counter */}
           <div className="absolute bottom-3 right-3 rounded bg-black/50 px-2 py-1 text-xs text-white">
             {currentIndex + 1} / {slides.length}
           </div>
         </main>
       </div>
+
+      {/* Fullscreen presentation layer */}
+      <div
+        ref={presentRef}
+        className={[
+          'fixed inset-0 z-50 flex items-center justify-center bg-black',
+          isPresenting ? 'block' : 'hidden',
+        ].join(' ')}
+        onClick={goToNext}
+      >
+        {currentSlide?.status === 'done' && currentSlide.url && (
+          <img
+            src={currentSlide.url}
+            alt={currentSlide.title}
+            className="max-h-full max-w-full object-contain"
+          />
+        )}
+
+        <NavArrows
+          showPrev={currentIndex > 0}
+          showNext={currentIndex < slides.length - 1}
+          onPrev={(e) => { e.stopPropagation(); goToPrev() }}
+          onNext={(e) => { e.stopPropagation(); goToNext() }}
+        />
+
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-white/10 px-3 py-1 text-xs text-white/60 select-none">
+          ESC to exit · ← → or click to navigate
+        </div>
+
+        <div className="absolute bottom-4 right-4 rounded bg-black/50 px-2 py-1 text-xs text-white">
+          {currentIndex + 1} / {slides.length}
+        </div>
+      </div>
     </div>
+  )
+}
+
+// ── Shared nav arrows ─────────────────────────────────────────────────────────
+
+interface NavArrowsProps {
+  showPrev: boolean
+  showNext: boolean
+  onPrev: (e: React.MouseEvent<HTMLButtonElement>) => void
+  onNext: (e: React.MouseEvent<HTMLButtonElement>) => void
+}
+
+function NavArrows({ showPrev, showNext, onPrev, onNext }: NavArrowsProps) {
+  return (
+    <>
+      {showPrev && (
+        <button
+          onClick={onPrev}
+          className="absolute left-3 top-1/2 -translate-y-1/2 rounded-md bg-white/10 p-2 text-white hover:bg-white/20"
+          aria-label="Previous slide"
+        >
+          <IconChevronLeft className="size-5" />
+        </button>
+      )}
+      {showNext && (
+        <button
+          onClick={onNext}
+          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md bg-white/10 p-2 text-white hover:bg-white/20"
+          aria-label="Next slide"
+        >
+          <IconChevronRight className="size-5" />
+        </button>
+      )}
+    </>
   )
 }
