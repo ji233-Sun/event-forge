@@ -23,6 +23,7 @@ import {
   IconCalendar,
   IconMail,
   IconEdit,
+  IconDeviceFloppy,
 } from '@tabler/icons-react'
 import type { ProfileData } from './actions'
 
@@ -165,7 +166,7 @@ export function ProfileContent({ user, data }: { user: User; data: ProfileData }
                   {savingProfile ? (
                     <><IconLoader2 size={14} className="animate-spin" />Saving...</>
                   ) : editing ? (
-                    <><IconLoader2 size={14} />Save</>
+                    <><IconDeviceFloppy size={14} />Save</>
                   ) : (
                     <><IconEdit size={14} />Edit Profile</>
                   )}
@@ -231,7 +232,7 @@ export function ProfileContent({ user, data }: { user: User; data: ProfileData }
             <StatCard
               icon={<IconActivity size={18} />}
               label="Active Rate"
-              value={data.stats.responseRate}
+              value={data.stats.publishedRate}
               suffix="%"
               color="bg-rose-50 text-rose-600"
             />

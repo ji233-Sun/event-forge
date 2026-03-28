@@ -16,7 +16,7 @@ export type ProfileStats = {
   totalSurveys: number
   totalResponses: number
   activeSurveys: number
-  responseRate: number
+  publishedRate: number
 }
 
 export type SurveyStatusBreakdown = {
@@ -68,7 +68,7 @@ export async function getProfileData(): Promise<ProfileData> {
   const totalSurveys = surveysResult.count
   const totalResponses = responsesResult.count
   const activeSurveys = activeResult.count
-  const responseRate = totalSurveys > 0 ? Math.round((activeSurveys / totalSurveys) * 100) : 0
+  const publishedRate = totalSurveys > 0 ? Math.round((activeSurveys / totalSurveys) * 100) : 0
 
   // --- Status Breakdown ---
   const [draftResult] = await db
@@ -128,7 +128,7 @@ export async function getProfileData(): Promise<ProfileData> {
   }))
 
   return {
-    stats: { totalSurveys, totalResponses, activeSurveys, responseRate },
+    stats: { totalSurveys, totalResponses, activeSurveys, publishedRate },
     statusBreakdown: { draft: draftResult.count, published: activeResult.count, closed: closedResult.count },
     responseTrend,
     recentSurveys,

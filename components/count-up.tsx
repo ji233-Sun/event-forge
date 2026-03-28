@@ -6,7 +6,7 @@ export function CountUp({ end, duration = 1500, suffix = '' }: { end: number; du
   const [value, setValue] = useState(0)
 
   useEffect(() => {
-    let start = 0
+    let frameId: number
     const startTime = performance.now()
 
     function tick(now: number) {
@@ -16,12 +16,12 @@ export function CountUp({ end, duration = 1500, suffix = '' }: { end: number; du
       const eased = 1 - Math.pow(1 - progress, 3)
       setValue(Math.round(eased * end))
       if (progress < 1) {
-        requestAnimationFrame(tick)
+        frameId = requestAnimationFrame(tick)
       }
     }
 
-    requestAnimationFrame(tick)
-    return () => { start = end }
+    frameId = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(frameId)
   }, [end, duration])
 
   return <>{value}{suffix}</>

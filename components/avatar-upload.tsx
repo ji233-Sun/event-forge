@@ -40,9 +40,16 @@ export function AvatarUpload({
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)
 
+  const MAX_UPLOAD_BYTES = 10 * 1024 * 1024 // 10MB
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file || !file.type.startsWith('image/')) return
+    if (file.size > MAX_UPLOAD_BYTES) {
+      alert('Image must be smaller than 10 MB')
+      e.target.value = ''
+      return
+    }
     setUploading(true)
     try {
       const dataUrl = await resizeImage(file, 128)
@@ -67,7 +74,7 @@ export function AvatarUpload({
           {name.charAt(0).toUpperCase()}
         </div>
       )}
-      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+      <div className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/40 opacity-0 transition-opacity group-hover:opacity-100">
         {uploading ? (
           <IconLoader2 size={24} className="animate-spin text-white" />
         ) : (

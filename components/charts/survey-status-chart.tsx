@@ -10,6 +10,18 @@ echarts.use([PieChart, TooltipComponent, LegendComponent, CanvasRenderer])
 
 type StatusData = { draft: number; published: number; closed: number }
 
+/** Read a CSS variable value from :root */
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
+/** Convert a CSS variable to a usable color string */
+function resolveColor(varName: string): string {
+  const raw = cssVar(varName)
+  if (!raw) return '#888'
+  return `oklch(${raw})`
+}
+
 export function SurveyStatusChart({ data }: { data: StatusData }) {
   const chartRef = useRef<HTMLDivElement>(null)
 
@@ -18,16 +30,27 @@ export function SurveyStatusChart({ data }: { data: StatusData }) {
     const chart = echarts.init(chartRef.current)
     const total = data.draft + data.published + data.closed
 
+    const popover = resolveColor('--popover')
+    const border = resolveColor('--border')
+    const foreground = resolveColor('--foreground')
+    const mutedFg = resolveColor('--muted-foreground')
+    const background = resolveColor('--background')
+
+    // Status-specific colors: amber for draft, green for published, red for closed
+    const draftColor = resolveColor('--chart-2')
+    const publishedColor = resolveColor('--chart-1')
+    const closedColor = resolveColor('--chart-5')
+
     const option: echarts.EChartsCoreOption = {
       animation: true,
       animationDuration: 1200,
       animationEasing: 'cubicOut',
       tooltip: {
         trigger: 'item',
-        backgroundColor: 'rgba(255,255,255,0.96)',
-        borderColor: '#e5e5e5',
+        backgroundColor: popover,
+        borderColor: border,
         borderWidth: 1,
-        textStyle: { fontSize: 12, color: '#333' },
+        textStyle: { fontSize: 12, color: foreground },
         formatter: (params: unknown) => {
           const p = params as { name: string; value: number; percent: number }
           return `<strong>${p.name}</strong><br/>Count: ${p.value} (${p.percent}%)`
@@ -38,7 +61,7 @@ export function SurveyStatusChart({ data }: { data: StatusData }) {
         itemWidth: 10,
         itemHeight: 10,
         itemGap: 16,
-        textStyle: { fontSize: 11, color: '#666' },
+        textStyle: { fontSize: 11, color: mutedFg },
       },
       graphic: total > 0
         ? [
@@ -50,7 +73,7 @@ export function SurveyStatusChart({ data }: { data: StatusData }) {
                 text: String(total),
                 fontSize: 22,
                 fontWeight: 'bold',
-                fill: '#333',
+                fill: foreground,
                 textAlign: 'center',
               },
             },
@@ -61,7 +84,7 @@ export function SurveyStatusChart({ data }: { data: StatusData }) {
               style: {
                 text: 'Total',
                 fontSize: 11,
-                fill: '#999',
+                fill: mutedFg,
                 textAlign: 'center',
               },
             },
@@ -73,16 +96,16 @@ export function SurveyStatusChart({ data }: { data: StatusData }) {
           radius: ['48%', '72%'],
           center: ['50%', '45%'],
           avoidLabelOverlap: false,
-          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          itemStyle: { borderRadius: 6, borderColor: background, borderWidth: 2 },
           label: { show: false },
           emphasis: {
             label: { show: false },
             itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0,0,0,0.1)' },
           },
           data: [
-            { value: data.draft, name: 'Draft', itemStyle: { color: '#f59e0b' } },
-            { value: data.published, name: 'Published', itemStyle: { color: '#16a34a' } },
-            { value: data.closed, name: 'Closed', itemStyle: { color: '#ef4444' } },
+            { value: data.draft, name: 'Draft', itemStyle: { color: draftColor } },
+            { value: data.published, name: 'Published', itemStyle: { color: publishedColor } },
+            { value: data.closed, name: 'Closed', itemStyle: { color: closedColor } },
           ],
         },
       ],

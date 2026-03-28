@@ -94,7 +94,24 @@ function StatusBadge({ status }: { status: string }) {
 
 // ─── Mini Bar Chart ───
 function ResponseChart({ data }: { data: ResponseTrendDay[] }) {
+  if (data.length === 0) {
+    return (
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between border-b px-5 py-3.5">
+          <CardTitle className="text-sm font-semibold">Response Trend</CardTitle>
+          <span className="text-xs text-muted-foreground">Last 7 days</span>
+        </CardHeader>
+        <CardContent className="flex h-[200px] items-center justify-center p-5">
+          <p className="text-sm text-muted-foreground">No response data yet</p>
+        </CardContent>
+      </Card>
+    )
+  }
+
   const max = Math.max(...data.map((d) => d.count), 1)
+  const total = data.reduce((s, d) => s + d.count, 0)
+  const peak = data.reduce((m, d) => (d.count > m.count ? d : m), data[0])
+
   return (
     <Card className="shadow-sm">
       <CardHeader className="flex flex-row items-center justify-between border-b px-5 py-3.5">
@@ -124,19 +141,19 @@ function ResponseChart({ data }: { data: ResponseTrendDay[] }) {
           <div>
             <p className="text-[11px] text-muted-foreground">Avg. / day</p>
             <p className="text-lg font-semibold">
-              {Math.round(data.reduce((s, d) => s + d.count, 0) / data.length)}
+              {Math.round(total / data.length)}
             </p>
           </div>
           <div>
             <p className="text-[11px] text-muted-foreground">Peak</p>
             <p className="text-lg font-semibold">
-              {data.reduce((max, d) => (d.count > max.count ? d : max), data[0]).date}
+              {peak.date}
             </p>
           </div>
           <div>
             <p className="text-[11px] text-muted-foreground">Total</p>
             <p className="text-lg font-semibold text-primary">
-              +{data.reduce((s, d) => s + d.count, 0)}
+              +{total}
             </p>
           </div>
         </div>
@@ -290,7 +307,7 @@ export function DashboardContent({ data }: { data: DashboardData }) {
           iconBg="bg-rose-50"
           iconColor="text-rose-600"
           label="Active Rate"
-          value={`${stats.avgResponseRate}%`}
+          value={`${stats.publishedRate}%`}
         />
       </div>
 

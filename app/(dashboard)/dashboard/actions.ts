@@ -33,7 +33,7 @@ export type DashboardStats = {
   totalSurveys: number
   totalResponses: number
   activeSurveys: number
-  avgResponseRate: number
+  publishedRate: number
 }
 
 export async function getDashboardData() {
@@ -56,16 +56,10 @@ export async function getDashboardData() {
     .from(survey)
     .where(and(eq(survey.userId, user.id), eq(survey.status, 'published')))
 
-  // Surveys with at least 1 question => "complete" survey
-  const [completeSurveysResult] = await db
-    .select({ count: count() })
-    .from(survey)
-    .where(eq(survey.userId, user.id))
-
   const totalSurveys = totalSurveysResult.count
   const totalResponses = totalResponsesResult.count
   const activeSurveys = activeSurveysResult.count
-  const avgResponseRate =
+  const publishedRate =
     totalSurveys > 0
       ? Math.round((activeSurveys / totalSurveys) * 100)
       : 0
@@ -74,7 +68,7 @@ export async function getDashboardData() {
     totalSurveys,
     totalResponses,
     activeSurveys,
-    avgResponseRate,
+    publishedRate,
   }
 
   // --- Recent Surveys ---
@@ -84,7 +78,7 @@ export async function getDashboardData() {
     limit: 10,
     with: {
       questions: { columns: { id: true } },
-      responses: { columns: { id: true }, orderBy: desc(response.createdAt), limit: 1 },
+      responses: { columns: { id: true }, orderBy: (r, { desc }) => [desc(r.createdAt)], limit: 1 },
     },
   })
 

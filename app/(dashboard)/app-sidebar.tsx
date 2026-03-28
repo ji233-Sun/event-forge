@@ -45,8 +45,12 @@ export function AppSidebar({ user }: { user: User }) {
   const router = useRouter()
 
   async function handleLogout() {
-    await authClient.signOut()
-    router.push('/login')
+    try {
+      await authClient.signOut()
+    } catch {
+      // Sign-out failed — redirect to login regardless
+    }
+    router.replace('/login')
   }
 
   return (
