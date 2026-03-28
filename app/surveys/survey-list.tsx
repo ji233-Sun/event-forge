@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { deleteSurvey, publishSurvey, closeSurvey } from './actions'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -26,6 +26,11 @@ import {
   IconCircleX,
 } from '@tabler/icons-react'
 import { useState } from 'react'
+
+const surveyDateFormatter = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeZone: 'UTC',
+})
 
 type SurveyWithCounts = {
   id: string
@@ -75,14 +80,17 @@ export function SurveyList({ surveys }: { surveys: SurveyWithCounts[] }) {
 function SurveyCard({ survey: s }: { survey: SurveyWithCounts }) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
 
   async function handlePublish() {
     setLoading(true)
+    setError('')
     try {
       await publishSurvey(s.id)
       router.refresh()
-    } catch {
-      // Optionally show error toast
+    } catch (publishError) {
+      setError(publishError instanceof Error ? publishError.message : 'Failed to publish survey')
+      console.error('Failed to publish survey', publishError)
     } finally {
       setLoading(false)
     }
@@ -90,11 +98,13 @@ function SurveyCard({ survey: s }: { survey: SurveyWithCounts }) {
 
   async function handleClose() {
     setLoading(true)
+    setError('')
     try {
       await closeSurvey(s.id)
       router.refresh()
-    } catch {
-      // Optionally show error toast
+    } catch (closeError) {
+      setError(closeError instanceof Error ? closeError.message : 'Failed to close survey')
+      console.error('Failed to close survey', closeError)
     } finally {
       setLoading(false)
     }
@@ -102,11 +112,13 @@ function SurveyCard({ survey: s }: { survey: SurveyWithCounts }) {
 
   async function handleDelete() {
     setLoading(true)
+    setError('')
     try {
       await deleteSurvey(s.id)
       router.refresh()
-    } catch {
-      // Optionally show error toast
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : 'Failed to delete survey')
+      console.error('Failed to delete survey', deleteError)
     } finally {
       setLoading(false)
     }
@@ -128,8 +140,9 @@ function SurveyCard({ survey: s }: { survey: SurveyWithCounts }) {
           <div className="mt-2 flex items-center gap-4 text-xs text-muted-foreground">
             <span>{s.questions.length} questions</span>
             <span>{s.responses.length} responses</span>
-            <span>{new Date(s.createdAt).toLocaleDateString()}</span>
+            <span>{surveyDateFormatter.format(new Date(s.createdAt))}</span>
           </div>
+          {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -162,7 +175,13 @@ function SurveyCard({ survey: s }: { survey: SurveyWithCounts }) {
                 </Link>
               </Button>
               {s.slug && (
-                <Button variant="ghost" size="sm" asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Open public link"
+                  title="Open public link"
+                  asChild
+                >
                   <Link href={`/s/${s.slug}`} target="_blank">
                     <IconExternalLink size={16} />
                   </Link>
@@ -186,7 +205,13 @@ function SurveyCard({ survey: s }: { survey: SurveyWithCounts }) {
           )}
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="text-destructive hover:text-destructive">
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="text-destructive hover:text-destructive"
+                aria-label="Delete survey"
+                title="Delete survey"
+              >
                 <IconTrash size={16} />
               </Button>
             </DialogTrigger>

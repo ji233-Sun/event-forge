@@ -2,7 +2,7 @@
 
 import { eq, and, count, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { survey, question, response } from '@/lib/db/survey-schema'
+import { survey, question, response } from '@/lib/db/auth-schema'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 
@@ -17,6 +17,32 @@ function generateSlug() {
     result += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   return result
+}
+
+async function generateUniqueSlug() {
+  while (true) {
+    const slug = generateSlug()
+    const existing = await db.query.survey.findFirst({
+      where: eq(survey.slug, slug),
+      columns: { id: true },
+    })
+
+    if (!existing) {
+      return slug
+    }
+  }
+}
+
+function isChoiceQuestion(type: string) {
+  return type === 'single_choice' || type === 'multiple_choice' || type === 'dropdown'
+}
+
+function normalizeOptions(options: string[] | null | undefined) {
+  if (!Array.isArray(options)) {
+    return []
+  }
+
+  return options.map((option) => option.trim()).filter((option) => option.length > 0)
 }
 
 async function requireAuth() {
@@ -65,13 +91,38 @@ export async function deleteSurvey(surveyId: string) {
 
 export async function publishSurvey(surveyId: string) {
   const user = await requireAuth()
-  // Reuse existing slug to keep previously shared links valid
   const existing = await db.query.survey.findFirst({
     where: and(eq(survey.id, surveyId), eq(survey.userId, user.id)),
-    columns: { slug: true },
+    columns: { id: true, slug: true },
+    with: {
+      questions: {
+        columns: {
+          id: true,
+          type: true,
+          options: true,
+        },
+      },
+    },
   })
   if (!existing) throw new Error('Survey not found')
-  const slug = existing.slug ?? generateSlug()
+
+  if (existing.questions.length === 0) {
+    throw new Error('Add at least one question before publishing')
+  }
+
+  for (const item of existing.questions) {
+    if (!isChoiceQuestion(item.type)) {
+      continue
+    }
+
+    const options = normalizeOptions(item.options)
+    if (!Array.isArray(item.options) || options.length !== item.options.length || options.length === 0) {
+      throw new Error('Choice questions must include at least one non-empty option before publishing')
+    }
+  }
+
+  const slug = existing.slug ?? await generateUniqueSlug()
+
   const result = await db
     .update(survey)
     .set({ status: 'published', slug })
@@ -133,17 +184,17 @@ export async function saveQuestions(surveyId: string, questionsInput: QuestionIn
   })
   if (!s) throw new Error('Survey not found')
 
-  // Block rewrite once responses exist — question IDs would become irreconcilable
-  const [{ value: responseCount }] = await db
-    .select({ value: count() })
-    .from(response)
-    .where(eq(response.surveyId, surveyId))
-  if (responseCount > 0) {
-    throw new Error('Cannot modify questions after responses have been collected')
-  }
-
   // Atomically delete existing questions and re-insert
   await db.transaction(async (tx) => {
+    const [{ value: responseCount }] = await tx
+      .select({ value: count() })
+      .from(response)
+      .where(eq(response.surveyId, surveyId))
+
+    if (responseCount > 0) {
+      throw new Error('Cannot modify questions after responses have been collected')
+    }
+
     await tx.delete(question).where(eq(question.surveyId, surveyId))
     if (questionsInput.length > 0) {
       await tx.insert(question).values(

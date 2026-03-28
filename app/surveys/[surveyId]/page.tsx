@@ -14,6 +14,11 @@ import {
 import { ResponsesTable } from './components/responses-table'
 import { CopyLinkButton } from './components/copy-link-button'
 
+const surveyDateFormatter = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeZone: 'UTC',
+})
+
 export default async function SurveyDetailPage({
   params,
 }: {
@@ -81,7 +86,7 @@ export default async function SurveyDetailPage({
               <StatCard
                 icon={<IconClipboardList size={20} />}
                 label="Created"
-                value={new Date(data.createdAt).toLocaleDateString()}
+                value={surveyDateFormatter.format(new Date(data.createdAt))}
               />
             </div>
 
@@ -113,7 +118,7 @@ export default async function SurveyDetailPage({
                     </span>
                     <span className="font-medium">{q.title}</span>
                     <Badge variant="outline" className="text-[10px]">
-                      {q.type.replace('_', ' ')}
+                      {q.type.replaceAll('_', ' ')}
                     </Badge>
                     {q.required && (
                       <span className="text-xs text-destructive">required</span>
@@ -159,4 +164,3 @@ function StatCard({
     </Card>
   )
 }
-

@@ -2,7 +2,6 @@
 
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import {
@@ -44,6 +43,10 @@ export function QuestionEditor({
   onChange: (updated: QuestionData) => void
   onDelete: () => void
 }) {
+  const typeId = `type-${question.id}`
+  const titleId = `title-${question.id}`
+  const descriptionId = `description-${question.id}`
+
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...question.options]
     newOptions[index] = value
@@ -72,7 +75,12 @@ export function QuestionEditor({
             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
               {question.order + 1}
             </span>
+            <Label htmlFor={typeId} className="sr-only">
+              Question type
+            </Label>
             <select
+              id={typeId}
+              aria-label="Question type"
               value={question.type}
               onChange={(e) => {
                 const newType = e.target.value
@@ -104,7 +112,12 @@ export function QuestionEditor({
           </div>
 
           {/* Title */}
+          <Label htmlFor={titleId} className="sr-only">
+            Question title
+          </Label>
           <Input
+            id={titleId}
+            aria-label="Question title"
             placeholder="Question title"
             className="h-9 text-base font-medium focus-visible:ring-primary/20"
             value={question.title}
@@ -112,7 +125,12 @@ export function QuestionEditor({
           />
 
           {/* Description */}
+          <Label htmlFor={descriptionId} className="sr-only">
+            Question description
+          </Label>
           <Input
+            id={descriptionId}
+            aria-label="Question description"
             placeholder="Description (optional)"
             className="h-8 text-sm text-muted-foreground focus-visible:ring-primary/20"
             value={question.description}
@@ -125,7 +143,12 @@ export function QuestionEditor({
               {question.options.map((opt, idx) => (
                 <div key={idx} className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground w-4">{idx + 1}.</span>
+                  <Label htmlFor={`option-${question.id}-${idx}`} className="sr-only">
+                    Option {idx + 1}
+                  </Label>
                   <Input
+                    id={`option-${question.id}-${idx}`}
+                    aria-label={`Option ${idx + 1}`}
                     value={opt}
                     onChange={(e) => handleOptionChange(idx, e.target.value)}
                     className="h-8 text-sm focus-visible:ring-primary/20"
