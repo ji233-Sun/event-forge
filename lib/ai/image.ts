@@ -254,17 +254,18 @@ async function downloadImage(url: string): Promise<GeneratedImage> {
     )
   }
 
-  const uint8Array = new Uint8Array(await response.arrayBuffer())
   const rawContentType = response.headers.get('content-type')?.split(';')[0]?.trim()
-  const mediaType = VALID_IMAGE_MEDIA_TYPES.includes(
-    rawContentType as (typeof VALID_IMAGE_MEDIA_TYPES)[number],
-  )
-    ? rawContentType!
-    : 'image/png'
+  if (!VALID_IMAGE_MEDIA_TYPES.includes(rawContentType as (typeof VALID_IMAGE_MEDIA_TYPES)[number])) {
+    throw new Error(
+      `Unexpected content-type from image URL: ${rawContentType ?? 'none'} (status ${response.status})`,
+    )
+  }
+
+  const uint8Array = new Uint8Array(await response.arrayBuffer())
 
   return {
     base64: Buffer.from(uint8Array).toString('base64'),
-    mediaType,
+    mediaType: rawContentType!,
     uint8Array,
   }
 }

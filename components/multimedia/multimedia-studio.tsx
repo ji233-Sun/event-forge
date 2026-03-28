@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { IconArrowRight, IconSparkles, IconWaveSine } from '@tabler/icons-react'
 
 import { MultimediaResult } from '@/components/multimedia/multimedia-result'
@@ -31,6 +31,13 @@ export function MultimediaStudio() {
   const [copied, setCopied] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const requestIdRef = useRef(0)
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current !== null) clearTimeout(copyTimeoutRef.current)
+    }
+  }, [])
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -94,7 +101,9 @@ export function MultimediaStudio() {
 
     try {
       await navigator.clipboard.writeText(result.socialCopy.shareText)
+      if (copyTimeoutRef.current !== null) clearTimeout(copyTimeoutRef.current)
       setCopied(true)
+      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
     } catch {
       setError('Copying failed. Please copy the text manually.')
     }
