@@ -5,6 +5,12 @@ import {
   CardContent,
 } from '@/components/ui/card'
 
+const responseDateFormatter = new Intl.DateTimeFormat('en-US', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'UTC',
+})
+
 type Question = {
   id: string
   type: string
@@ -58,7 +64,7 @@ export function ResponsesTable({
                   <tr key={r.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
                     <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
                     <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {new Date(r.createdAt).toLocaleString()}
+                      {responseDateFormatter.format(new Date(r.createdAt))}
                     </td>
                     {questions.map((q) => (
                       <td key={q.id} className="px-4 py-3 max-w-[200px] truncate">

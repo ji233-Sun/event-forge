@@ -61,7 +61,9 @@ export default function PublicSurveyPage() {
 
     // Validate required fields
     for (const q of survey.questions) {
-      if (q.required && !answers[q.id]) {
+      const answer = answers[q.id]
+      const isEmpty = !answer || (Array.isArray(answer) && answer.length === 0)
+      if (q.required && isEmpty) {
         setError(`Please answer: ${q.title}`)
         return
       }

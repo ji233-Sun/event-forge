@@ -137,6 +137,8 @@ export function QuestionEditor({
                     size="icon-xs"
                     onClick={() => removeOption(idx)}
                     className="shrink-0 text-muted-foreground hover:text-destructive"
+                    aria-label={`Remove option ${idx + 1}`}
+                    title={`Remove option ${idx + 1}`}
                   >
                     <IconX size={14} />
                   </Button>
@@ -163,6 +165,8 @@ export function QuestionEditor({
           size="icon-sm"
           onClick={onDelete}
           className="shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
+          aria-label="Delete question"
+          title="Delete question"
         >
           <IconTrash size={16} />
         </Button>

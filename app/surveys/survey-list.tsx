@@ -78,23 +78,38 @@ function SurveyCard({ survey: s }: { survey: SurveyWithCounts }) {
 
   async function handlePublish() {
     setLoading(true)
-    await publishSurvey(s.id)
-    router.refresh()
-    setLoading(false)
+    try {
+      await publishSurvey(s.id)
+      router.refresh()
+    } catch {
+      // Optionally show error toast
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleClose() {
     setLoading(true)
-    await closeSurvey(s.id)
-    router.refresh()
-    setLoading(false)
+    try {
+      await closeSurvey(s.id)
+      router.refresh()
+    } catch {
+      // Optionally show error toast
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleDelete() {
     setLoading(true)
-    await deleteSurvey(s.id)
-    router.refresh()
-    setLoading(false)
+    try {
+      await deleteSurvey(s.id)
+      router.refresh()
+    } catch {
+      // Optionally show error toast
+    } finally {
+      setLoading(false)
+    }
   }
 
   const status = s.status

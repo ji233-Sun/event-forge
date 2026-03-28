@@ -10,16 +10,27 @@ export function CopyLinkButton({ path }: { path: string }) {
   const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(fullUrl)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(fullUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      setCopied(false)
+    }
   }
 
   return (
     <div className="flex gap-2">
       <Input readOnly value={fullUrl} className="font-mono text-sm" />
-      <Button variant="outline" size="icon" className="shrink-0" onClick={handleCopy}>
-        {copied ? <IconCheck size={16} className="text-green-600" /> : <IconCopy size={16} />}
+      <Button
+        variant="outline"
+        size="icon"
+        className="shrink-0"
+        onClick={handleCopy}
+        aria-label={copied ? 'Link copied' : 'Copy survey link'}
+        title={copied ? 'Link copied' : 'Copy survey link'}
+      >
+        {copied ? <IconCheck size={16} className="text-primary" /> : <IconCopy size={16} />}
       </Button>
     </div>
   )

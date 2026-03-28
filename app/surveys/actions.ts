@@ -1,6 +1,6 @@
 'use server'
 
-import { eq, and, or } from 'drizzle-orm'
+import { eq, and, count, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { survey, question, response } from '@/lib/db/survey-schema'
 import { auth } from '@/lib/auth'
@@ -43,12 +43,14 @@ export async function createSurvey(title: string, description: string) {
 
 export async function updateSurvey(
   surveyId: string,
-  data: { title?: string; description?: string; status?: string },
+  data: { title?: string; description?: string },
 ) {
   const user = await requireAuth()
+  // Exclude status from content updates — use publishSurvey/closeSurvey for lifecycle changes
+  const { title, description } = data
   const result = await db
     .update(survey)
-    .set(data)
+    .set({ title, description })
     .where(and(eq(survey.id, surveyId), eq(survey.userId, user.id)))
     .returning()
   return result[0]
@@ -63,7 +65,13 @@ export async function deleteSurvey(surveyId: string) {
 
 export async function publishSurvey(surveyId: string) {
   const user = await requireAuth()
-  const slug = generateSlug()
+  // Reuse existing slug to keep previously shared links valid
+  const existing = await db.query.survey.findFirst({
+    where: and(eq(survey.id, surveyId), eq(survey.userId, user.id)),
+    columns: { slug: true },
+  })
+  if (!existing) throw new Error('Survey not found')
+  const slug = existing.slug ?? generateSlug()
   const result = await db
     .update(survey)
     .set({ status: 'published', slug })
@@ -125,23 +133,33 @@ export async function saveQuestions(surveyId: string, questionsInput: QuestionIn
   })
   if (!s) throw new Error('Survey not found')
 
-  // Delete existing questions and re-insert (simple replace strategy)
-  await db.delete(question).where(eq(question.surveyId, surveyId))
-
-  if (questionsInput.length > 0) {
-    await db.insert(question).values(
-      questionsInput.map((q) => ({
-        id: q.id || generateId(),
-        surveyId,
-        type: q.type,
-        title: q.title,
-        description: q.description || null,
-        required: q.required,
-        options: q.options || null,
-        order: q.order,
-      })),
-    )
+  // Block rewrite once responses exist — question IDs would become irreconcilable
+  const [{ value: responseCount }] = await db
+    .select({ value: count() })
+    .from(response)
+    .where(eq(response.surveyId, surveyId))
+  if (responseCount > 0) {
+    throw new Error('Cannot modify questions after responses have been collected')
   }
+
+  // Atomically delete existing questions and re-insert
+  await db.transaction(async (tx) => {
+    await tx.delete(question).where(eq(question.surveyId, surveyId))
+    if (questionsInput.length > 0) {
+      await tx.insert(question).values(
+        questionsInput.map((q) => ({
+          id: q.id || generateId(),
+          surveyId,
+          type: q.type,
+          title: q.title,
+          description: q.description || null,
+          required: q.required,
+          options: q.options || null,
+          order: q.order,
+        })),
+      )
+    }
+  })
 
   return { success: true }
 }
