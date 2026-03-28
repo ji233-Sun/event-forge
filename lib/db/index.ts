@@ -1,8 +1,8 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import postgres from 'postgres'
-import * as schema from './auth-schema'
+import * as authSchema from './auth-schema'
 
 // Supabase Transaction Pool mode — prepare must be disabled
 const client = postgres(process.env.DATABASE_URL!, { prepare: false })
 
-export const db = drizzle({ client, schema })
+export const db = drizzle({ client, schema: authSchema })

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { IconSparkles, IconArrowRight } from '@tabler/icons-react'
+import { IconSparkles, IconArrowRight, IconPresentation } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
 
 export function HeroSection() {
@@ -44,11 +44,17 @@ export function HeroSection() {
           <Button variant="outline" size="lg" asChild>
             <Link href="/studio">Launch Multimedia Studio</Link>
           </Button>
+          <Button variant="outline" size="lg" asChild>
+            <Link href="/slides">
+              Try Slide Studio
+              <IconPresentation size={18} />
+            </Link>
+          </Button>
         </div>
 
         {/* Trust indicator */}
         <p className="mt-6 text-sm text-muted-foreground">
-          No credit card required. Free for everyone.
+          Start from the landing page or jump straight into AI slide generation.
         </p>
       </div>
     </section>

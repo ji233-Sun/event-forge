@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "typecheck": "tsc --noEmit",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
@@ -12,6 +13,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^3.0.48",
+    "@marp-team/marp-core": "^4.3.0",
     "@tabler/icons-react": "^3.41.0",
     "ai": "^6.0.141",
     "better-auth": "^1.5.6",
