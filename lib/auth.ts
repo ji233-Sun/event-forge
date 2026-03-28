@@ -20,6 +20,7 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: true,
   },
   plugins: [
     emailOTP({
@@ -28,11 +29,8 @@ export const auth = betterAuth({
         const from = process.env.EMAIL_FROM ?? 'onboarding@resend.dev'
 
         console.log('[emailOTP] sendVerificationOTP called', {
-          email,
           type,
-          from,
           hasResendKey: !!process.env.RESEND_API_KEY,
-          resendKeyPrefix: process.env.RESEND_API_KEY?.slice(0, 8),
         })
 
         const { data, error } = await resend.emails.send({
@@ -43,11 +41,11 @@ export const auth = betterAuth({
         })
 
         if (error) {
-          console.error('[emailOTP] Resend send failed', { email, type, error })
-          throw new Error(`邮件发送失败: ${error.message}`)
+          console.error('[emailOTP] Resend send failed', { type })
+          throw new Error('邮件发送失败，请稍后重试')
         }
 
-        console.log('[emailOTP] Resend send success', { email, type, messageId: data?.id })
+        console.log('[emailOTP] Resend send success', { messageId: data?.id })
       },
     }),
     jwt(),

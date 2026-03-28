@@ -5,7 +5,7 @@ import { type NextRequest } from 'next/server'
 const handler = toNextJsHandler(auth)
 
 export async function GET(req: NextRequest) {
-  console.log('[auth route] GET', req.nextUrl.pathname + req.nextUrl.search)
+  console.log('[auth route] GET', req.nextUrl.pathname)
   return handler.GET(req)
 }
 
