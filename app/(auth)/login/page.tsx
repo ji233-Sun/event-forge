@@ -47,7 +47,7 @@ export default function LoginPage() {
     const { error } = await authClient.signIn.email({ email, password })
 
     if (!error) {
-      router.push('/')
+      router.push('/dashboard')
       router.refresh()
       return
     }
@@ -95,7 +95,7 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/')
+    router.push('/dashboard')
     router.refresh()
   }
 
