@@ -1,6 +1,8 @@
 import type {
   BaseColor,
+  BodyFont,
   CardStyle,
+  HeadingFont,
   PrimaryColor,
   TemplateValues,
   ThemeMode,
@@ -47,7 +49,7 @@ const BASE_TONES: Record<
   },
 };
 
-const FONT_QUERY: Record<TemplateValues["headingFont"] | TemplateValues["bodyFont"], string> = {
+const FONT_QUERY: Record<HeadingFont | BodyFont, string> = {
   Inter: "Inter:wght@400;500;600;700",
   "Playfair Display": "Playfair+Display:wght@500;600;700",
   Montserrat: "Montserrat:wght@500;600;700",
@@ -57,7 +59,10 @@ const FONT_QUERY: Record<TemplateValues["headingFont"] | TemplateValues["bodyFon
   Nunito: "Nunito:wght@400;500;700",
 };
 
-const FONT_STACKS = {
+const FONT_STACKS: {
+  heading: Record<HeadingFont, string>;
+  body: Record<BodyFont, string>;
+} = {
   heading: {
     Inter: "'Inter', 'Segoe UI', sans-serif",
     "Playfair Display": "'Playfair Display', Georgia, serif",
@@ -69,7 +74,7 @@ const FONT_STACKS = {
     "Open Sans": "'Open Sans', 'Segoe UI', sans-serif",
     Nunito: "'Nunito', 'Segoe UI', sans-serif",
   },
-} as const;
+};
 
 export function resolvePalette(values: TemplateValues): Palette {
   const modeKey: ThemeMode = values.themeMode;
@@ -100,8 +105,6 @@ function backgroundCss(values: TemplateValues, palette: Palette): string {
         radial-gradient(${palette.slideMuted}22 1px, transparent 1px),
         linear-gradient(140deg, ${palette.slideBg} 0%, ${palette.secondary}66 100%);
       background-size: 14px 14px, 100% 100%;`;
-    default:
-      return `background: linear-gradient(145deg, ${palette.slideBg} 0%, ${palette.secondary}66 100%);`;
   }
 }
 
@@ -115,8 +118,6 @@ function cardCss(cardStyle: CardStyle, palette: Palette): string {
       return `\n.panel, .kpi {\n  background: ${palette.cardBg};\n  border: 1px solid ${palette.cardBorder};\n  box-shadow: 10px 10px 20px rgba(15, 23, 42, 0.22), -8px -8px 18px rgba(255, 255, 255, 0.05);\n}`;
     case "brutalism":
       return `\n.panel, .kpi {\n  background: ${palette.cardBg};\n  border: 3px solid ${palette.primary};\n  box-shadow: 8px 8px 0 ${palette.secondary};\n}`;
-    default:
-      return "";
   }
 }
 
