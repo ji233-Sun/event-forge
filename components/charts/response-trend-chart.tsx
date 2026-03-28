@@ -1,106 +1,71 @@
 'use client'
 
-import { useRef, useEffect } from 'react'
-import * as echarts from 'echarts/core'
-import { LineChart } from 'echarts/charts'
-import { GridComponent, TooltipComponent, TitleComponent } from 'echarts/components'
-import { CanvasRenderer } from 'echarts/renderers'
-
-echarts.use([LineChart, GridComponent, TooltipComponent, TitleComponent, CanvasRenderer])
+import { useMemo } from 'react'
 
 type TrendDay = { date: string; count: number }
 
-const _colorEl = typeof document !== 'undefined' ? document.createElement('div') : null
-
-/** Resolve a CSS variable to an rgb() string that echarts can parse */
-function resolveColor(varName: string): string {
-  if (!_colorEl) return 'transparent'
-  _colorEl.style.color = `var(${varName})`
-  document.documentElement.appendChild(_colorEl)
-  try {
-    return getComputedStyle(_colorEl).color || 'transparent'
-  } finally {
-    _colorEl.remove()
+function normalizeTrendData(data: TrendDay[] | undefined): TrendDay[] {
+  if (!Array.isArray(data)) {
+    return []
   }
+
+  return data.flatMap((item) => {
+    if (!item || typeof item !== 'object') {
+      return []
+    }
+
+    const dateRaw = (item as { date?: unknown }).date
+    const countRaw = (item as { count?: unknown }).count
+    const date = typeof dateRaw === 'string' ? dateRaw.trim() : ''
+    const countCandidate = typeof countRaw === 'number' ? countRaw : Number(countRaw)
+    const count = Number.isFinite(countCandidate) ? countCandidate : 0
+
+    if (!date) {
+      return []
+    }
+
+    return [{ date, count }]
+  })
 }
 
-export function ResponseTrendChart({ data }: { data: TrendDay[] }) {
-  const chartRef = useRef<HTMLDivElement>(null)
-  const chartInstance = useRef<echarts.ECharts | null>(null)
+export function ResponseTrendChart({ data }: { data?: TrendDay[] }) {
+  const safeData = useMemo(() => normalizeTrendData(data), [data])
 
-  // Initialize once on mount
-  useEffect(() => {
-    if (!chartRef.current) return
-    chartInstance.current = echarts.init(chartRef.current)
-
-    const onResize = () => chartInstance.current?.resize()
-    window.addEventListener('resize', onResize)
-
-    return () => {
-      window.removeEventListener('resize', onResize)
-      chartInstance.current?.dispose()
-      chartInstance.current = null
+  const maxCount = useMemo(() => {
+    if (safeData.length === 0) {
+      return 1
     }
-  }, [])
 
-  // Update options when data changes
-  useEffect(() => {
-    if (!chartInstance.current) return
+    return Math.max(1, ...safeData.map((item) => item.count))
+  }, [safeData])
 
-    const primary = resolveColor('--primary')
-    const border = resolveColor('--border')
-    const mutedFg = resolveColor('--muted-foreground')
-    const popover = resolveColor('--popover')
-    const foreground = resolveColor('--foreground')
+  if (safeData.length === 0) {
+    return (
+      <div className="flex h-[220px] w-full items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground">
+        No response trend data yet.
+      </div>
+    )
+  }
 
-    chartInstance.current.setOption({
-      animation: true,
-      animationDuration: 1200,
-      animationEasing: 'cubicOut',
-      grid: { top: 16, right: 16, bottom: 32, left: 40 },
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: popover,
-        borderColor: border,
-        borderWidth: 1,
-        textStyle: { fontSize: 12, color: foreground },
-        formatter: (params: unknown) => {
-          const p = (params as { name: string; value: number }[])[0]
-          return `<strong>${p.name}</strong><br/>Responses: ${p.value}`
-        },
-      },
-      xAxis: {
-        type: 'category',
-        data: data.map((d) => d.date),
-        axisLine: { lineStyle: { color: border } },
-        axisTick: { show: false },
-        axisLabel: { fontSize: 11, color: mutedFg },
-      },
-      yAxis: {
-        type: 'value',
-        splitLine: { lineStyle: { color: border } },
-        axisLabel: { fontSize: 11, color: mutedFg },
-      },
-      series: [
-        {
-          type: 'line',
-          data: data.map((d) => d.count),
-          smooth: true,
-          symbol: 'circle',
-          symbolSize: 6,
-          lineStyle: { width: 2.5, color: primary },
-          itemStyle: { color: primary },
-          areaStyle: {
-            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: primary },
-              { offset: 1, color: 'transparent' },
-            ]),
-            opacity: 0.15,
-          },
-        },
-      ],
-    })
-  }, [data])
+  return (
+    <div className="h-[220px] w-full rounded-md border border-border/60 bg-background/40 px-3 py-3">
+      <div className="flex h-full items-end gap-2">
+        {safeData.map((item) => {
+          const normalizedHeight = Math.max(8, Math.round((item.count / maxCount) * 150))
 
-  return <div ref={chartRef} className="h-[220px] w-full" />
+          return (
+            <div key={item.date} className="flex min-w-0 flex-1 flex-col items-center justify-end gap-2">
+              <span className="text-[10px] font-medium text-muted-foreground">{item.count}</span>
+              <div
+                className="w-full rounded-t-sm bg-primary/75 transition-[height] duration-300"
+                style={{ height: `${normalizedHeight}px` }}
+                title={`${item.date}: ${item.count}`}
+              />
+              <span className="text-[10px] text-muted-foreground">{item.date}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
 }

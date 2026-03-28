@@ -47,6 +47,20 @@ const stagger = {
 
 export function ProfileContent({ user, data }: { user: User; data: ProfileData }) {
   const router = useRouter()
+  const safeStats = data?.stats ?? {
+    totalSurveys: 0,
+    totalResponses: 0,
+    activeSurveys: 0,
+    publishedRate: 0,
+  }
+  const safeStatusBreakdown = data?.statusBreakdown ?? {
+    draft: 0,
+    published: 0,
+    closed: 0,
+    other: 0,
+  }
+  const safeResponseTrend = Array.isArray(data?.responseTrend) ? data.responseTrend : []
+  const safeRecentSurveys = Array.isArray(data?.recentSurveys) ? data.recentSurveys : []
   const [name, setName] = useState(user.name)
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileError, setProfileError] = useState('')
@@ -215,25 +229,25 @@ export function ProfileContent({ user, data }: { user: User; data: ProfileData }
             <StatCard
               icon={<IconClipboardList size={18} />}
               label="Surveys Created"
-              value={data.stats.totalSurveys}
+              value={safeStats.totalSurveys}
               color="bg-primary/10 text-primary"
             />
             <StatCard
               icon={<IconUsers size={18} />}
               label="Total Responses"
-              value={data.stats.totalResponses}
+              value={safeStats.totalResponses}
               color="bg-indigo-50 text-indigo-600"
             />
             <StatCard
               icon={<IconChartBar size={18} />}
               label="Active Surveys"
-              value={data.stats.activeSurveys}
+              value={safeStats.activeSurveys}
               color="bg-amber-50 text-amber-600"
             />
             <StatCard
               icon={<IconActivity size={18} />}
               label="Active Rate"
-              value={data.stats.publishedRate}
+              value={safeStats.publishedRate}
               suffix="%"
               color="bg-rose-50 text-rose-600"
             />
@@ -248,7 +262,7 @@ export function ProfileContent({ user, data }: { user: User; data: ProfileData }
                 <CardTitle className="text-sm font-semibold">Response Trend</CardTitle>
               </CardHeader>
               <CardContent>
-                <ResponseTrendChart data={data.responseTrend} />
+                <ResponseTrendChart data={safeResponseTrend} />
               </CardContent>
             </Card>
             <Card className="border-border/50">
@@ -256,7 +270,7 @@ export function ProfileContent({ user, data }: { user: User; data: ProfileData }
                 <CardTitle className="text-sm font-semibold">Survey Status</CardTitle>
               </CardHeader>
               <CardContent>
-                <SurveyStatusChart data={data.statusBreakdown} />
+                <SurveyStatusChart data={safeStatusBreakdown} />
               </CardContent>
             </Card>
           </div>
@@ -335,11 +349,11 @@ export function ProfileContent({ user, data }: { user: User; data: ProfileData }
                 <CardTitle className="text-base">Recent Activity</CardTitle>
               </CardHeader>
               <CardContent>
-                {data.recentSurveys.length === 0 ? (
+                {safeRecentSurveys.length === 0 ? (
                   <p className="py-8 text-center text-sm text-muted-foreground">No surveys yet</p>
                 ) : (
                   <div className="space-y-3">
-                    {data.recentSurveys.map((s) => (
+                    {safeRecentSurveys.map((s) => (
                       <div key={s.id} className="flex items-center gap-3 rounded-lg border border-border/50 p-3 transition-colors hover:bg-muted/30">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-primary/10 text-xs font-bold text-primary">
                           {s.title.charAt(0).toUpperCase()}

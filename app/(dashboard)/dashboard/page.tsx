@@ -1,14 +1,20 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getDashboardData } from './actions'
 import { DashboardContent } from './dashboard-content'
 import { IconPlus, IconLayoutDashboard } from '@tabler/icons-react'
 import { Button } from '@/components/ui/button'
+import { auth } from '@/lib/auth'
 
 export const metadata = {
   title: 'Dashboard',
 }
 
 export default async function DashboardPage() {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (!session?.user) redirect('/login')
+
   const data = await getDashboardData()
 
   return (

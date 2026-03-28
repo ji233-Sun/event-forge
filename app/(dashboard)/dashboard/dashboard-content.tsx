@@ -3,9 +3,7 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import {
   IconFileText,
   IconUsers,
@@ -29,12 +27,6 @@ type DashboardData = {
   responseTrend: ResponseTrendDay[]
   topSurveys: { id: string; title: string; responseCount: number }[]
 }
-
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
-  month: 'short',
-  day: 'numeric',
-  year: 'numeric',
-})
 
 // ─── Stat Card ───
 function StatCard({
@@ -68,25 +60,13 @@ function StatCard({
   )
 }
 
-// ─── Mini Bar Chart ───
+// ─── Response Trend Summary ───
 function ResponseChart({ data }: { data: ResponseTrendDay[] }) {
-  if (data.length === 0) {
-    return (
-      <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between border-b px-5 py-3.5">
-          <CardTitle className="text-sm font-semibold">Response Trend</CardTitle>
-          <span className="text-xs text-muted-foreground">Last 7 days</span>
-        </CardHeader>
-        <CardContent className="flex h-[200px] items-center justify-center p-5">
-          <p className="text-sm text-muted-foreground">No response data yet</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  const max = Math.max(...data.map((d) => d.count), 1)
   const total = data.reduce((s, d) => s + d.count, 0)
-  const peak = data.reduce((m, d) => (d.count > m.count ? d : m), data[0])
+  const average = data.length > 0 ? Math.round(total / data.length) : 0
+  const peak = data.length > 0
+    ? data.reduce((m, d) => (d.count > m.count ? d : m), data[0])
+    : null
 
   return (
     <Card className="shadow-sm">
@@ -95,35 +75,17 @@ function ResponseChart({ data }: { data: ResponseTrendDay[] }) {
         <span className="text-xs text-muted-foreground">Last 7 days</span>
       </CardHeader>
       <CardContent className="p-5">
-        <div className="flex h-[140px] items-end gap-2">
-          {data.map((d, i) => {
-            const height = Math.max((d.count / max) * 100, 4)
-            const isToday = i === data.length - 1
-            return (
-              <div key={d.date} className="flex flex-1 flex-col items-center gap-2">
-                <div
-                  className={`w-full rounded-sm transition-colors ${
-                    isToday ? 'bg-primary' : 'bg-primary/20'
-                  }`}
-                  style={{ height: `${height}%` }}
-                />
-                <span className="text-[10px] text-muted-foreground">{d.date}</span>
-              </div>
-            )
-          })}
-        </div>
-        <Separator className="my-4" />
         <div className="grid grid-cols-3 gap-4 text-center">
           <div>
             <p className="text-[11px] text-muted-foreground">Avg. / day</p>
             <p className="text-lg font-semibold">
-              {Math.round(total / data.length)}
+              {average}
             </p>
           </div>
           <div>
             <p className="text-[11px] text-muted-foreground">Peak</p>
             <p className="text-lg font-semibold">
-              {peak.date}
+              {peak?.date ?? '-'}
             </p>
           </div>
           <div>

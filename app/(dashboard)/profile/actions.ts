@@ -110,13 +110,14 @@ export async function getProfileData(): Promise<ProfileData> {
       responses: { columns: { id: true } },
     },
   })
+  const safeRecentRows = Array.isArray(recentRows) ? recentRows : []
 
-  const recentSurveys: RecentSurvey[] = recentRows.map((s) => ({
+  const recentSurveys: RecentSurvey[] = safeRecentRows.map((s) => ({
     id: s.id,
     title: s.title,
     status: s.status,
     createdAt: s.createdAt,
-    responseCount: s.responses.length,
+    responseCount: Array.isArray(s.responses) ? s.responses.length : 0,
   }))
 
   return {
