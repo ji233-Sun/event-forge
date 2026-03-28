@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
-import { useOtpCooldown } from '@/hooks/use-otp-cooldown'
+import { getOtpErrorMessage, useOtpCooldown } from '@/hooks/use-otp-cooldown'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -107,7 +107,7 @@ export default function RegisterPage() {
     setLoading(false)
 
     if (verifyError) {
-      setError(verifyError.message ?? '验证码错误或已过期，请重新发送')
+      setError(getOtpErrorMessage(verifyError.code))
       return
     }
 
