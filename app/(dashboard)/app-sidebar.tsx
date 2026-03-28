@@ -30,6 +30,7 @@ import {
   IconLogout,
   IconUser,
   IconChevronUp,
+  IconPresentation,
 } from '@tabler/icons-react'
 import { authClient } from '@/lib/auth-client'
 
@@ -104,6 +105,17 @@ export function AppSidebar({ user }: { user: User }) {
                   <Link href="/surveys/new">
                     <IconPlus size={18} />
                     <span>Create Survey</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === '/slides'}
+                >
+                  <Link href="/slides">
+                    <IconPresentation size={18} />
+                    <span>Slide Studio</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

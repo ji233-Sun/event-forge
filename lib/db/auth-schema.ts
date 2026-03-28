@@ -142,6 +142,7 @@ export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   surveys: many(survey),
+  decks: many(deck),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -186,5 +187,31 @@ export const responseRelations = relations(response, ({ one }) => ({
   survey: one(survey, {
     fields: [response.surveyId],
     references: [survey.id],
+  }),
+}));
+
+export const deck = pgTable(
+  "deck",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    prompt: text("prompt").notNull(),
+    markdown: text("markdown").notNull(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("deck_userId_idx").on(table.userId, table.createdAt)],
+);
+
+export const deckRelations = relations(deck, ({ one }) => ({
+  user: one(user, {
+    fields: [deck.userId],
+    references: [user.id],
   }),
 }));

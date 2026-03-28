@@ -1,5 +1,7 @@
 import Marp from "@marp-team/marp-core";
 import { generate } from "@/lib/ai";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -239,6 +241,11 @@ async function generateMarpMarkdown(
 }
 
 export async function POST(req: Request) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
