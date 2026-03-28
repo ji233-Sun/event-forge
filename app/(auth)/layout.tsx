@@ -1,7 +1,14 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import { IconBolt } from '@tabler/icons-react'
+import { auth } from '@/lib/auth'
 
-export default function AuthLayout({ children }: { children: React.ReactNode }) {
+export default async function AuthLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth.api.getSession({ headers: await headers() })
+  if (session?.user) {
+    redirect('/dashboard')
+  }
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 antialiased">
       {/* 装饰性背景 */}
