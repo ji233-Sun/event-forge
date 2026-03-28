@@ -42,6 +42,9 @@ export function HeroSection() {
             </Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
+            <Link href="/studio">Launch Multimedia Studio</Link>
+          </Button>
+          <Button variant="outline" size="lg" asChild>
             <Link href="/slides">
               Try Slide Studio
               <IconPresentation size={18} />
