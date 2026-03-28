@@ -37,14 +37,20 @@ export async function POST(request: Request) {
     const data = await generateMultimediaExperience(brief)
 
     const recordId = crypto.randomUUID()
-    await db.insert(mediaGeneration).values({
-      id: recordId,
-      userId: session.user.id,
-      brief,
-      result: data,
-    })
+    let persistedId: string | null = null
+    try {
+      await db.insert(mediaGeneration).values({
+        id: recordId,
+        userId: session.user.id,
+        brief,
+        result: data,
+      })
+      persistedId = recordId
+    } catch (persistError) {
+      console.error('[multimedia route] failed to persist media history', persistError)
+    }
 
-    return Response.json({ data, id: recordId })
+    return Response.json({ data, id: persistedId })
   } catch (error) {
     console.error('[multimedia route] failed to generate media', error)
     return Response.json(

@@ -281,6 +281,7 @@ function HistoryTab({ initialData }: { initialData: MediaHistoryPage }) {
   const [data, setData] = useState(initialData)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -295,11 +296,14 @@ function HistoryTab({ initialData }: { initialData: MediaHistoryPage }) {
 
   const loadPage = useCallback(async (p: number) => {
     setLoading(true)
+    setLoadError(null)
     try {
       const result = await getMediaHistory(p)
       setData(result)
       setPage(p)
       setExpandedId(null)
+    } catch {
+      setLoadError('Failed to load history. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -346,6 +350,12 @@ function HistoryTab({ initialData }: { initialData: MediaHistoryPage }) {
             onCopy={() => handleCopy(item.result.socialCopy.shareText)}
           />
         ))}
+
+      {loadError && (
+        <div className="rounded-md border border-destructive/20 bg-destructive/10 px-4 py-3 text-center text-sm text-destructive">
+          {loadError}
+        </div>
+      )}
 
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-2 pt-2">

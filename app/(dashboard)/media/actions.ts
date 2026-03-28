@@ -32,7 +32,8 @@ export type MediaHistoryPage = {
 
 export async function getMediaHistory(page = 1): Promise<MediaHistoryPage> {
   const user = await requireAuth()
-  const offset = (page - 1) * PAGE_SIZE
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1
+  const offset = (safePage - 1) * PAGE_SIZE
 
   const [items, [totalResult]] = await Promise.all([
     db
