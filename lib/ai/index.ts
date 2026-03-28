@@ -50,5 +50,4 @@ export function stream(
   return streamText(params)
 }
 
-export { imageModel } from './image'
-export { generateImage } from './image'
+export { imageModel, generateImage } from './image'

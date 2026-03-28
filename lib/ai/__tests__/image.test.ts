@@ -30,6 +30,21 @@ describe('lib/ai/image', () => {
       // QWEN_MODEL_IMAGE not set in test env → falls back to wanx2.6-t2i-turbo
       expect(mockQwenProviderImage).toHaveBeenCalledWith('wanx2.6-t2i-turbo')
     })
+
+    it('uses QWEN_MODEL_IMAGE env var when set', async () => {
+      const original = process.env.QWEN_MODEL_IMAGE
+      process.env.QWEN_MODEL_IMAGE = 'custom-image-model'
+      mockQwenProviderImage.mockClear()
+      vi.resetModules()
+
+      await import('../image')
+
+      expect(mockQwenProviderImage).toHaveBeenCalledWith('custom-image-model')
+
+      // Restore
+      process.env.QWEN_MODEL_IMAGE = original
+      vi.resetModules()
+    })
   })
 
   describe('generateImage', () => {
