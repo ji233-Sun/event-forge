@@ -12,10 +12,6 @@ vi.mock('@/lib/ai', () => ({
   generateImage: mockGenerateImage,
 }))
 
-import {
-  DEFAULT_SOUNDTRACK_ID,
-  SOUNDTRACKS,
-} from '../audio-catalog'
 import { generateMultimediaExperience } from '../generator'
 
 describe('generateMultimediaExperience', () => {
@@ -30,7 +26,6 @@ describe('generateMultimediaExperience', () => {
         visualDirection: 'Chrome light beams over a campus lawn at dusk',
         posterPrompt:
           'Cyberpunk campus music festival poster, holographic stage, chrome haze, electric pink and acid green',
-        soundtrackId: SOUNDTRACKS[1].id,
         caption:
           '⚡ Campus after dark. Neon grass, live bands, and a crowd ready to glow. Save your Friday night for the loudest lawn in town.',
         cta: 'RSVP before the gates open',
@@ -62,7 +57,6 @@ describe('generateMultimediaExperience', () => {
         prompt:
           'Cyberpunk campus music festival poster, holographic stage, chrome haze, electric pink and acid green',
       },
-      soundtrack: SOUNDTRACKS[1],
       socialCopy: {
         caption:
           '⚡ Campus after dark. Neon grass, live bands, and a crowd ready to glow. Save your Friday night for the loudest lawn in town.',
@@ -74,16 +68,14 @@ describe('generateMultimediaExperience', () => {
     })
   })
 
-  it('falls back to the default soundtrack when the model returns an unknown key', async () => {
+  it('falls back to default hashtags when the model output is missing them', async () => {
     mockGenerate.mockResolvedValue({
       text: JSON.stringify({
         title: 'After Hours Parade',
         visualDirection: 'Laser grids over a city skyline',
         posterPrompt: 'Retro-futurist skyline concert poster',
-        soundtrackId: 'unknown-track',
         caption: '🌃 Night shift energy meets a live crowd.',
         cta: 'Bring your crew',
-        hashtags: ['#FutureNight'],
       }),
     })
     mockGenerateImage.mockResolvedValue({
@@ -99,7 +91,7 @@ describe('generateMultimediaExperience', () => {
       'Create a midnight launch party with synth-wave energy.',
     )
 
-    expect(result.soundtrack.id).toBe(DEFAULT_SOUNDTRACK_ID)
+    expect(result.socialCopy.hashtags).toEqual(['#EventForge', '#LiveEvent'])
     expect(result.poster.imageDataUrl).toBe('data:image/webp;base64,fallback-base64')
   })
 })

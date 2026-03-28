@@ -34,7 +34,7 @@ const EXAMPLE_BRIEFS = [
 
 const LOADING_MESSAGES = [
   { icon: IconPhoto, text: 'Crafting your poster...' },
-  { icon: IconMusic, text: 'Matching a soundtrack...' },
+  { icon: IconMusic, text: 'Preparing soundtrack controls...' },
   { icon: IconMessageCircle, text: 'Writing social copy...' },
   { icon: IconSparkles, text: 'Polishing the final kit...' },
 ]
@@ -430,7 +430,7 @@ function HistoryCard({
 
       {isExpanded && (
         <div className="border-t border-border/60 p-5">
-          <MultimediaResult copied={copied} onCopy={onCopy} result={item.result} />
+          <MultimediaResult copied={copied} onCopy={onCopy} result={item.result} showMusicGenerator={false} />
         </div>
       )}
     </Card>

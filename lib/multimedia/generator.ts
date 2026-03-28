@@ -1,7 +1,6 @@
 import 'server-only'
 
 import { generate, generateImage } from '@/lib/ai'
-import { getSoundtrackById, SOUNDTRACKS } from './audio-catalog'
 import type {
   MultimediaExperience,
   MultimediaModelPayload,
@@ -53,9 +52,6 @@ function parseModelPayload(raw: string): MultimediaModelPayload {
     title: parsed.title.trim(),
     visualDirection: parsed.visualDirection.trim(),
     posterPrompt: parsed.posterPrompt.trim(),
-    soundtrackId: isNonEmptyString(parsed.soundtrackId)
-      ? parsed.soundtrackId.trim()
-      : SOUNDTRACKS[0].id,
     caption: parsed.caption.trim(),
     cta: parsed.cta.trim(),
     hashtags: normalizeHashtags(parsed.hashtags),
@@ -71,18 +67,12 @@ function toDataUrl(image: { base64: string; mediaType?: string }) {
 }
 
 function buildSystemPrompt() {
-  const soundtrackOptions = SOUNDTRACKS.map((track) => `${track.id}: ${track.description}`).join(
-    '\n',
-  )
-
   return [
     'You are the multimedia orchestrator for EventForge.',
     'Return strict JSON only. Do not wrap the response in markdown.',
     'All copy must be in English.',
-    'Choose exactly one soundtrackId from this list:',
-    soundtrackOptions,
     'Return this shape:',
-    '{"title":"","visualDirection":"","posterPrompt":"","soundtrackId":"","caption":"","cta":"","hashtags":["#EventForge"]}',
+    '{"title":"","visualDirection":"","posterPrompt":"","caption":"","cta":"","hashtags":["#EventForge"]}',
     'Caption should be 2-4 energetic sentences with emoji.',
     'Poster prompt should be detailed enough for an image model.',
   ].join('\n')
@@ -108,8 +98,6 @@ export async function generateMultimediaExperience(
     throw new Error('The image model did not return a poster')
   }
 
-  const soundtrack = getSoundtrackById(metadata.soundtrackId)
-
   return {
     brief: normalizedBrief,
     concept: {
@@ -121,7 +109,6 @@ export async function generateMultimediaExperience(
       imageDataUrl: toDataUrl(poster),
       prompt: metadata.posterPrompt,
     },
-    soundtrack,
     socialCopy: {
       caption: metadata.caption,
       cta: metadata.cta,
