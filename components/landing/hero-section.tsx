@@ -42,7 +42,7 @@ export function HeroSection() {
             </Link>
           </Button>
           <Button variant="outline" size="lg" asChild>
-            <Link href="#features">Explore Features</Link>
+            <Link href="/studio">Launch Multimedia Studio</Link>
           </Button>
         </div>
 

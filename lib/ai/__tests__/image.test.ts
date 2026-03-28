@@ -3,12 +3,14 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 // Hoisted mocks — executed before any import
 vi.mock('server-only', () => ({}))
 
-const { mockQwenProviderImage, mockSdkGenerateImage } = vi.hoisted(() => ({
+const { mockAssertQwenApiKey, mockQwenProviderImage, mockSdkGenerateImage } = vi.hoisted(() => ({
+  mockAssertQwenApiKey: vi.fn(),
   mockQwenProviderImage: vi.fn().mockReturnValue({ modelId: 'mock-image-model' }),
   mockSdkGenerateImage: vi.fn(),
 }))
 
 vi.mock('../provider', () => ({
+  assertQwenApiKey: mockAssertQwenApiKey,
   qwenProvider: {
     image: mockQwenProviderImage,
   },
@@ -53,6 +55,7 @@ describe('lib/ai/image', () => {
 
       await generateImage('a sunset over mountains')
 
+      expect(mockAssertQwenApiKey).toHaveBeenCalled()
       expect(mockSdkGenerateImage).toHaveBeenCalledWith({
         model: imageModel,
         prompt: 'a sunset over mountains',
