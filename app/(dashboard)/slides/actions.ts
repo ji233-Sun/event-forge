@@ -62,7 +62,7 @@ export async function getDeck(deckId: string): Promise<DeckFull> {
   return {
     ...row,
     mode: (row.mode ?? 'marp') as SlideMode,
-    images: (row.images as ImageSlide[] | null) ?? null,
+    images: row.images ?? null,
   }
 }
 

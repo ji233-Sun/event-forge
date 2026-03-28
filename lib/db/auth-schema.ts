@@ -212,6 +212,14 @@ export const mediaGenerationRelations = relations(mediaGeneration, ({ one }) => 
   }),
 }));
 
+type ImageSlideJsonb = {
+  index: number
+  title: string
+  imagePrompt: string
+  base64: string
+  mediaType: string
+}
+
 export const deck = pgTable(
   "deck",
   {
@@ -220,7 +228,7 @@ export const deck = pgTable(
     prompt: text("prompt").notNull(),
     mode: text("mode").notNull().default("marp"),
     markdown: text("markdown"),
-    images: jsonb("images"),
+    images: jsonb("images").$type<ImageSlideJsonb[] | null>(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
