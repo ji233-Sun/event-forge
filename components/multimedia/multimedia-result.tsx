@@ -94,9 +94,9 @@ export function MultimediaResult({
           <Textarea aria-label="Social share text" className="mt-5 min-h-40 resize-none" readOnly value={result.socialCopy.shareText} />
 
           <div className="mt-4 flex flex-wrap gap-2">
-            {result.socialCopy.hashtags.map((hashtag) => (
+            {result.socialCopy.hashtags.map((hashtag, index) => (
               <span
-                key={hashtag}
+                key={`${hashtag}-${index}`}
                 className="rounded-full border border-border/70 px-3 py-1 text-xs text-muted-foreground"
               >
                 {hashtag}

@@ -70,7 +70,7 @@ describe('lib/ai/image', () => {
             JSON.stringify({
               output: {
                 task_status: 'SUCCEEDED',
-                results: [{ url: 'https://cdn.example.com/poster.png' }],
+                results: [{ url: 'https://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/poster.png' }],
               },
             }),
             {
@@ -146,8 +146,9 @@ describe('lib/ai/image', () => {
       )
       expect(fetchMock).toHaveBeenNthCalledWith(
         3,
-        'https://cdn.example.com/poster.png',
+        'https://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/poster.png',
         expect.objectContaining({
+          redirect: 'manual',
           signal: expect.any(AbortSignal),
         }),
       )

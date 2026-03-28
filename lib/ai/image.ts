@@ -20,6 +20,15 @@ const TASK_TIMEOUT_MS = 120_000
 const FETCH_TIMEOUT_MS = 30_000
 const VALID_IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
 
+/** Allowed hostnames for provider-returned image URLs (SSRF protection). */
+const ALLOWED_IMAGE_HOSTS = new Set([
+  'dashscope.aliyuncs.com',
+  'dashscope-result-bj.oss-cn-beijing.aliyuncs.com',
+  'dashscope-result-sh.oss-cn-shanghai.aliyuncs.com',
+  'dashscope-result-hz.oss-cn-hangzhou.aliyuncs.com',
+  'dashscope-result-wlcb.oss-cn-wulanchabu.aliyuncs.com',
+])
+
 type GeneratedImage = {
   base64: string
   mediaType: string
@@ -110,15 +119,25 @@ function normalizeSize(modelId: string, size?: string) {
   return `${width}*${height}`
 }
 
-async function fetchWithTimeout(
+/**
+ * Fetch with timeout that optionally keeps the AbortController active during
+ * body consumption. When `responseHandler` is provided the timeout covers the
+ * entire round-trip (headers + body read); without it only headers are covered.
+ */
+async function fetchWithTimeout<T = Response>(
   url: string,
   options: RequestInit,
+  responseHandler?: (response: Response) => Promise<T>,
   timeoutMs: number = FETCH_TIMEOUT_MS,
-): Promise<Response> {
+): Promise<T> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    return await fetch(url, { ...options, signal: controller.signal })
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    if (responseHandler) {
+      return await responseHandler(response)
+    }
+    return response as unknown as T
   } finally {
     clearTimeout(timeoutId)
   }
@@ -216,13 +235,16 @@ async function waitForTask(taskId: string) {
   const deadline = Date.now() + TASK_TIMEOUT_MS
 
   while (Date.now() <= deadline) {
-    const response = await fetchWithTimeout(`${qwenApiBaseURL}/tasks/${taskId}`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${getQwenApiKey()}`,
+    const payload = await fetchWithTimeout(
+      `${qwenApiBaseURL}/tasks/${taskId}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${getQwenApiKey()}`,
+        },
       },
-    })
-    const payload = await readJsonResponse(response, 'task polling')
+      (res) => readJsonResponse(res, 'task polling'),
+    )
     const status = payload.output?.task_status
 
     if (status === 'SUCCEEDED') {
@@ -245,29 +267,51 @@ async function waitForTask(taskId: string) {
   throw new Error('DashScope image task timed out')
 }
 
+/** Validates that `url` is https and from an allowed host. */
+function assertAllowedImageUrl(url: string) {
+  const parsed = new URL(url)
+  if (parsed.protocol !== 'https:') {
+    throw new Error(`Image URL must use HTTPS: ${url}`)
+  }
+  if (!ALLOWED_IMAGE_HOSTS.has(parsed.hostname)) {
+    throw new Error(`Untrusted image host: ${parsed.hostname}`)
+  }
+}
+
 async function downloadImage(url: string): Promise<GeneratedImage> {
-  const response = await fetchWithTimeout(url, {})
+  assertAllowedImageUrl(url)
 
-  if (!response.ok) {
-    throw new Error(
-      `Failed to download generated image: ${response.status} ${response.statusText}`.trim(),
-    )
-  }
+  return fetchWithTimeout(url, { redirect: 'manual' }, async (response) => {
+    // Block redirects to arbitrary hosts
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location')
+      if (location) {
+        assertAllowedImageUrl(new URL(location, url).href)
+      }
+      throw new Error(`Image download redirected unexpectedly: ${response.status}`)
+    }
 
-  const rawContentType = response.headers.get('content-type')?.split(';')[0]?.trim()
-  if (!VALID_IMAGE_MEDIA_TYPES.includes(rawContentType as (typeof VALID_IMAGE_MEDIA_TYPES)[number])) {
-    throw new Error(
-      `Unexpected content-type from image URL: ${rawContentType ?? 'none'} (status ${response.status})`,
-    )
-  }
+    if (!response.ok) {
+      throw new Error(
+        `Failed to download generated image: ${response.status} ${response.statusText}`.trim(),
+      )
+    }
 
-  const uint8Array = new Uint8Array(await response.arrayBuffer())
+    const rawContentType = response.headers.get('content-type')?.split(';')[0]?.trim()
+    if (!VALID_IMAGE_MEDIA_TYPES.includes(rawContentType as (typeof VALID_IMAGE_MEDIA_TYPES)[number])) {
+      throw new Error(
+        `Unexpected content-type from image URL: ${rawContentType ?? 'none'} (status ${response.status})`,
+      )
+    }
 
-  return {
-    base64: Buffer.from(uint8Array).toString('base64'),
-    mediaType: rawContentType!,
-    uint8Array,
-  }
+    const uint8Array = new Uint8Array(await response.arrayBuffer())
+
+    return {
+      base64: Buffer.from(uint8Array).toString('base64'),
+      mediaType: rawContentType!,
+      uint8Array,
+    }
+  })
 }
 
 async function generateWanImage(
@@ -275,15 +319,15 @@ async function generateWanImage(
   prompt: string,
   options: GenerateImageOptions,
 ) {
-  const response = await fetchWithTimeout(
+  const payload = await fetchWithTimeout(
     `${qwenApiBaseURL}/services/aigc/image-generation/generation`,
     {
       method: 'POST',
       headers: buildHeaders(true),
       body: JSON.stringify(buildRequestBody(modelId, prompt, options)),
     },
+    (res) => readJsonResponse(res, 'image task creation'),
   )
-  const payload = await readJsonResponse(response, 'image task creation')
   const taskId = payload.output?.task_id
 
   if (!taskId) {
@@ -298,16 +342,15 @@ async function generateQwenImage(
   prompt: string,
   options: GenerateImageOptions,
 ) {
-  const response = await fetchWithTimeout(
+  return fetchWithTimeout(
     `${qwenApiBaseURL}/services/aigc/multimodal-generation/generation`,
     {
       method: 'POST',
       headers: buildHeaders(false),
       body: JSON.stringify(buildRequestBody(modelId, prompt, options)),
     },
+    (res) => readJsonResponse(res, 'image generation'),
   )
-
-  return readJsonResponse(response, 'image generation')
 }
 
 export const imageModel = normalizeImageModel(process.env.QWEN_MODEL_IMAGE)
