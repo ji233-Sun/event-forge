@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const { html, css } = marp.render(body.markdown);
     return Response.json({ html, css });
   } catch (error) {
-    console.error("[slides-test/render] failed:", error);
+    console.error("[slides/render] failed:", error);
     return Response.json(
       { error: "Failed to render markdown with Marp" },
       { status: 500 }

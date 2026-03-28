@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { generateMarpMarkdown } from "@/app/slides-test/_lib/marp-sample";
+import { generateMarpMarkdown } from "@/lib/slides/marp-sample";
 import type { TemplateValues } from "@/lib/slides/template/config";
 
 // Bare grid — no card borders, no backgrounds, just the slides themselves
@@ -138,7 +138,7 @@ function SlideDeckPreviewImpl({ values }: { values: TemplateValues }) {
 
   useEffect(() => {
     const ctrl = new AbortController();
-    fetch("/api/slides-test/render", {
+    fetch("/api/slides/render", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ markdown }),
@@ -222,9 +222,11 @@ function SlideDeckPreviewImpl({ values }: { values: TemplateValues }) {
 
   return (
     <div className="relative h-full w-full">
+      {/* Full-cover loading overlay — hides stale content during re-render */}
       {isLoading && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center">
-          <span className="text-xs text-muted-foreground">Rendering...</span>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 bg-background/80 backdrop-blur-sm">
+          <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+          <span className="text-xs text-muted-foreground">Rendering…</span>
         </div>
       )}
       {state.error && (
