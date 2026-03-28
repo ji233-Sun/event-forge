@@ -11,15 +11,9 @@ import {
   IconChevronRight,
   IconPhoto,
 } from '@tabler/icons-react'
+import type { ImageSlideState } from './image-types'
 
-export type ImageSlideState = {
-  index: number
-  title: string
-  imagePrompt: string
-  status: 'pending' | 'done' | 'failed'
-  base64?: string
-  mediaType?: string
-}
+export type { ImageSlideState } from './image-types'
 
 interface ImageStudioViewProps {
   slides: ImageSlideState[]
@@ -89,12 +83,14 @@ export function ImageStudioView({ slides, onBack }: ImageStudioViewProps) {
           <Button
             variant="outline"
             size="sm"
+            disabled={!currentSlide?.base64}
             onClick={() => {
               if (currentSlide?.base64 && currentSlide.mediaType) {
                 const w = window.open('', '_blank')
                 w?.document.write(
                   `<img src="data:${currentSlide.mediaType};base64,${currentSlide.base64}" style="width:100%;height:100%;object-fit:contain;background:#000">`,
                 )
+                w?.document.close()
               }
             }}
           >

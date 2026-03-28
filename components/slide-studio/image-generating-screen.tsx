@@ -1,8 +1,7 @@
 'use client'
 
 import { IconLoader2 } from '@tabler/icons-react'
-
-type SlideStatus = 'pending' | 'done' | 'failed'
+import type { SlideStatus } from './image-types'
 
 interface ImageGeneratingScreenProps {
   totalSlides: number
@@ -33,7 +32,7 @@ export function ImageGeneratingScreen({
         <>
           <div className="w-64 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-1.5 rounded-full bg-foreground transition-all duration-300"
+              className="h-1.5 rounded-full bg-primary transition-all duration-300"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
