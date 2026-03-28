@@ -45,14 +45,44 @@ describe("POST /api/generate-slides", () => {
     });
   });
 
+  it("returns 400 when the parsed JSON body is not an object", async () => {
+    const request = new Request("http://localhost/api/generate-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "null",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Invalid JSON body",
+    });
+  });
+
+  it("rejects a whitespace-only prompt", async () => {
+    const request = new Request("http://localhost/api/generate-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "   " }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "prompt is required",
+    });
+  });
+
   it("retries until the deck has at least 6 slides and passes the requested language to the model", async () => {
     mockGenerate
       .mockResolvedValueOnce({
-        text: "```\n---\nmarp: true\n---\n\n# One\n\n---\n\n# Two\n\n---\n\n# Three\n\n---\n\n# Four\n```",
+        text: "```\n# One\n```",
         finishReason: "stop",
       })
       .mockResolvedValueOnce({
-        text: "```\n---\nmarp: true\n---\n\n# One\n\n---\n\n# Two\n\n---\n\n# Three\n\n---\n\n# Four\n\n---\n\n# Five\n\n---\n\n# Six\n```",
+        text: "```\n# One\n\n---\n\n# Two\n\n---\n\n# Three\n\n---\n\n# Four\n\n---\n\n# Five\n\n---\n\n# Six\n```",
         finishReason: "stop",
       });
 
@@ -78,7 +108,12 @@ describe("POST /api/generate-slides", () => {
       "Create a Marp Markdown slide deck in Spanish"
     );
     expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain(
-      "Content language: Spanish"
+      "All slide copy must be written in Spanish"
+    );
+    expect(mockGenerate.mock.calls[0]?.[2]?.system).not.toContain("内容使用中文");
+    expect(mockGenerate.mock.calls[1]?.[2]?.system).not.toContain("内容使用中文");
+    expect(mockGenerate.mock.calls[1]?.[2]?.system).toContain(
+      "Hard requirement: output at least 6 slides."
     );
     expect(payload.markdown).toContain("# Six");
   });

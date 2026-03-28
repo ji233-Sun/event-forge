@@ -1,6 +1,8 @@
 import Marp from "@marp-team/marp-core";
 import { generate } from "@/lib/ai";
+import { auth } from "@/lib/auth";
 import { parseSlides, joinSlides } from "@/lib/slides";
+import { headers } from "next/headers";
 
 /**
  * Condensed style constraints injected when editing a single slide.
@@ -22,13 +24,29 @@ ECharts：保持 data-option 为合法 JSON，backgroundColor 为 "transparent"�
 仅修改被要求的内容，保持整体 Marp Markdown 格式。
 输出纯 Markdown，不要用代码块包裹，不要任何说明文字。`;
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export async function POST(req: Request) {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+  if (!session?.user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();
   } catch {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+
+  if (!isPlainObject(body)) {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
   const { markdown, instruction, scope, currentSlideIndex } = body as {
     markdown?: string;
     instruction?: string;

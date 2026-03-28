@@ -1,15 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { mockGenerate, mockRender } = vi.hoisted(() => ({
+const { mockGenerate, mockRender, mockGetSession, mockHeaders } = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
   mockRender: vi.fn(() => ({
     html: "<section>Rendered</section>",
     css: "section { color: red; }",
   })),
+  mockGetSession: vi.fn(),
+  mockHeaders: vi.fn(),
 }));
 
 vi.mock("@/lib/ai", () => ({
   generate: mockGenerate,
+}));
+
+vi.mock("@/lib/auth", () => ({
+  auth: {
+    api: {
+      getSession: mockGetSession,
+    },
+  },
+}));
+
+vi.mock("next/headers", () => ({
+  headers: mockHeaders,
 }));
 
 vi.mock("@marp-team/marp-core", () => ({
@@ -23,18 +37,55 @@ import { POST } from "./route";
 afterEach(() => {
   mockGenerate.mockReset();
   mockRender.mockReset();
+  mockGetSession.mockReset();
+  mockHeaders.mockReset();
   mockRender.mockImplementation(() => ({
     html: "<section>Rendered</section>",
     css: "section { color: red; }",
   }));
+  mockGetSession.mockResolvedValue({ user: { id: "user_123" } });
+  mockHeaders.mockResolvedValue(new Headers());
 });
 
 describe("POST /api/edit-slides", () => {
+  it("returns 401 before parsing the body when the user is unauthenticated", async () => {
+    mockGetSession.mockResolvedValueOnce(null);
+
+    const request = new Request("http://localhost/api/edit-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      error: "Unauthorized",
+    });
+    expect(mockGenerate).not.toHaveBeenCalled();
+  });
+
   it("returns 400 when the request body is not valid JSON", async () => {
     const request = new Request("http://localhost/api/edit-slides", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: "{",
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      error: "Invalid JSON body",
+    });
+  });
+
+  it("returns 400 when the parsed JSON body is not a plain object", async () => {
+    const request = new Request("http://localhost/api/edit-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "null",
     });
 
     const response = await POST(request);
