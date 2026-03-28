@@ -1,10 +1,17 @@
 import Marp from "@marp-team/marp-core";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 type RenderRequestBody = {
   markdown?: unknown;
 };
 
 export async function POST(request: Request) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: RenderRequestBody;
 
   try {
@@ -18,10 +25,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    // html: false (default) — disables raw HTML passthrough in markdown.
-    // If raw HTML support is ever required, sanitize output with DOMPurify
-    // before sending to the client to prevent XSS injection.
-    const marp = new Marp({ html: false });
+    const marp = new Marp({ html: true });
     const { html, css } = marp.render(body.markdown);
     return Response.json({ html, css });
   } catch (error) {

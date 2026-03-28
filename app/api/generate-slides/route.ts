@@ -1,11 +1,10 @@
 import Marp from "@marp-team/marp-core";
 import { generate } from "@/lib/ai";
 import { auth } from "@/lib/auth";
+import { isPlainObject } from "@/lib/api-utils";
+import { buildDynamicStyle, replaceMarkdownStyle, type Palette } from "@/lib/slides/template/css-builder";
+import { DEFAULT_TEMPLATE_VALUES, TEMPLATE_OPTIONS, type TemplateValues } from "@/lib/slides/template/config";
 import { headers } from "next/headers";
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function extractMarkdown(text: string): string {
   const mdCodeBlockMatch = text.match(/```(?:markdown|md)?\s*([\s\S]*?)```/i);
@@ -31,7 +30,17 @@ function isChineseLanguage(language: string): boolean {
   return /^(zh\b|zh-|chinese\b|中文|简体中文|繁體中文)/i.test(language.trim());
 }
 
-function buildBaseSystemPrompt(language: string): string {
+function isValidTemplateValues(v: unknown): v is TemplateValues {
+  if (!isPlainObject(v)) return false;
+  return (Object.entries(TEMPLATE_OPTIONS) as Array<[keyof TemplateValues, readonly string[]]>).every(
+    ([key, options]) => {
+      const value = (v as Record<string, unknown>)[key];
+      return typeof value === "string" && (options as readonly string[]).includes(value);
+    },
+  );
+}
+
+function buildBaseSystemPrompt(language: string, templateCss: string, palette: Palette): string {
   const normalizedLanguage = language.trim() || "English";
   const isChinese = isChineseLanguage(normalizedLanguage);
   const label = isChinese ? "中文" : normalizedLanguage;
@@ -56,12 +65,9 @@ function buildBaseSystemPrompt(language: string): string {
   const chartJsonPlaceholder = isChinese ? "柱状图JSON" : "bar chart JSON";
   const pieJsonPlaceholder = isChinese ? "饼图JSON" : "pie chart JSON";
 
+  const indentedCss = templateCss.trim().split("\n").map((l) => `  ${l}`).join("\n");
+
   return `You are a top-tier presentation designer and information-visualization specialist. Generate a Marp Markdown slide deck.
-CRITICAL INSTRUCTION: Dynamically adapt the design, color palette, and visual theme to match the topic, content, and tone of the presentation. Do NOT use a single fixed style.
-- If it is a corporate presentation, use professional, clean styles (e.g., light backgrounds, blue/gray accents).
-- If it is a tech/cyber event, use dark themes with neon accents.
-- If it is a nature/eco event, use greens, earthy tones, and organic palettes.
-- If it is a playful/creative event, use bright, vibrant colors.
 
 Required:
 - Output pure Marp Markdown only. No explanation or extra wrapper text.
@@ -70,88 +76,26 @@ Required:
 - Separate each slide with ---.
 
 Marp directives:
-- Start with a YAML front-matter block.
-- Write a custom CSS \`style\` block that defines your chosen theme colors in \`:root\` and applies them.
-- Base your CSS on the following skeleton. You MUST replace the "[GENERATE HEX]" placeholders with ACTUAL hex codes matching your chosen theme:
+- Start with this exact YAML front-matter. Copy the style block verbatim — do NOT alter any values:
 
-  marp: true
-  theme: default
-  paginate: true
-  style: |
-    :root {
-      --bg-main: [GENERATE HEX];
-      --bg-grad: [GENERATE HEX];
-      --text-main: [GENERATE HEX];
-      --text-muted: [GENERATE HEX];
-      --accent-1: [GENERATE HEX];
-      --accent-2: [GENERATE HEX];
-      --accent-3: [GENERATE HEX];
-    }
-    section {
-      font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      color: var(--text-main);
-      background: linear-gradient(140deg, var(--bg-main) 0%, var(--bg-grad) 100%);
-      padding: 44px 56px;
-      line-height: 1.45;
-    }
-    /* You can optionally add subtle background radials or styling here if it fits the theme */
-    section::before {
-      content: "";
-      position: absolute;
-      inset: 14px;
-      border: 1px solid rgba(128,128,128,0.2);
-      border-radius: 18px;
-      pointer-events: none;
-    }
-    h1, h2, h3 {
-      margin: 0 0 14px;
-      letter-spacing: .5px;
-    }
-    h1 { color: var(--accent-1); font-size: 54px; text-align: left; }
-    h2 { color: var(--accent-2); font-size: 40px; }
-    h3 { color: var(--accent-3); font-size: 30px; }
-    p, li { font-size: 23px; }
-    ul { margin: 8px 0 0; }
-    strong { color: var(--accent-1); }
-    .kpi-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-top: 14px;
-    }
-    .kpi {
-      padding: 16px 14px;
-      border-radius: 14px;
-      background: rgba(128,128,128,0.06);
-      border: 1px solid var(--accent-2);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.05);
-    }
-    .kpi .label { font-size: 16px; color: var(--text-muted); margin-bottom: 6px; }
-    .kpi .value { font-size: 34px; color: var(--accent-3); font-weight: 700; }
-    .panel {
-      margin-top: 12px;
-      padding: 14px 16px;
-      border-radius: 14px;
-      border: 1px solid var(--accent-1);
-      background: rgba(128,128,128,0.04);
-      backdrop-filter: blur(6px);
-    }
-    .two-col {
-      display: grid;
-      grid-template-columns: 1.15fr .85fr;
-      gap: 20px;
-      align-items: start;
-    }
-    .timeline-item {
-      margin: 10px 0;
-      padding-left: 12px;
-      border-left: 3px solid var(--accent-1);
-    }
-    .cover h1 { font-size: 64px; text-align: center; margin-top: 40px; }
-    .cover p { text-align: center; color: var(--accent-2); font-size: 30px; }
-    .echarts-chart { width: 100%; height: 280px; border-radius: 14px; background: rgba(128,128,128,0.03); border: 1px solid var(--accent-1); padding: 6px; }
-    .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
-    .chart-row .echarts-chart { height: 250px; }
+\`\`\`
+---
+marp: true
+theme: default
+paginate: true
+style: |
+${indentedCss}
+---
+\`\`\`
+
+- The CSS theme above is already finalized. Do NOT override colors, fonts, or backgrounds. Generate slide content and layout only.
+
+ECharts color values — use these EXACT hex literals in every chart (CSS variables are NOT allowed inside JSON):
+- Primary: ${palette.primary}
+- Secondary: ${palette.secondary}
+- Accent: ${palette.accent}
+- Muted text: ${palette.slideMuted}
+- Main text: ${palette.slideText}
 
 Slide structure:
 - Include at least a cover, agenda, multiple content slides, and a closing slide.
@@ -180,7 +124,6 @@ Copy rules:
 - Keep the writing concise and presentation-ready.
 
 Visual direction:
-- ALWAYS match the aesthetic to the specific topic (e.g., Light/Dark theme, Formal/Creative).
 - Use cards, shadows, borders, and translucent panels for depth based on your CSS.
 - Leave enough whitespace so each slide has a clear focal point.
 
@@ -190,22 +133,22 @@ ECharts rules:
 - Each chart id must be unique.
 - data-option must be valid JSON using double quotes.
 - Always set "backgroundColor":"transparent".
-- EXTREMELY IMPORTANT: Do NOT use CSS variables (like var(--accent-1)) inside the ECharts JSON. You MUST use the exact literal HEX codes (e.g., "#0056b3") that you generated for your theme.
-- Set the "color" array to use your generated accent hex colors.
-- Set axisLine.lineStyle.color and axisLabel.color to your generated text-muted hex color.
+- EXTREMELY IMPORTANT: Do NOT use CSS variables inside the ECharts JSON. You MUST use the exact literal HEX codes provided above.
+- Set the "color" array to use your accent hex colors.
+- Set axisLine.lineStyle.color and axisLabel.color to your muted text hex color.
 - Use "splitLine":{"lineStyle":{"color":"rgba(128,128,128,0.2)"}}.
 - Use "animationDuration":1200 and "animationEasing":"cubicInOut".
 - Preferred chart types: bar, line with areaStyle, pie with donut radius.
 - Put chart titles in h2/h3 above the chart instead of inside the option JSON.
 
-Bar chart example (Replace "#HEX..." placeholders with the exact hex colors from your theme):
-<div id="chart-1" class="echarts-chart" data-option='{"color":["#HEX1","#HEX2","#HEX3","#HEX4","#HEX5"],"backgroundColor":"transparent","tooltip":{},"grid":{"top":40,"bottom":30,"left":60,"right":20},"xAxis":{"type":"category","data":${JSON.stringify(barCategories)},"axisLine":{"lineStyle":{"color":"#HEX_MUTED"}},"axisLabel":{"color":"#HEX_MUTED"}},"yAxis":{"splitLine":{"lineStyle":{"color":"rgba(128,128,128,0.2)"}},"axisLabel":{"color":"#HEX_MUTED"}},"series":[{"type":"bar","data":[15,20,10,25,8],"barWidth":"40%","animationDuration":1200,"animationEasing":"cubicInOut"}]}'></div>
+Bar chart example:
+<div id="chart-1" class="echarts-chart" data-option='{"color":["${palette.primary}","${palette.secondary}","${palette.accent}","${palette.slideMuted}","${palette.slideText}"],"backgroundColor":"transparent","tooltip":{},"grid":{"top":40,"bottom":30,"left":60,"right":20},"xAxis":{"type":"category","data":${JSON.stringify(barCategories)},"axisLine":{"lineStyle":{"color":"${palette.slideMuted}"}},"axisLabel":{"color":"${palette.slideMuted}"}},"yAxis":{"splitLine":{"lineStyle":{"color":"rgba(128,128,128,0.2)"}},"axisLabel":{"color":"${palette.slideMuted}"}},"series":[{"type":"bar","data":[15,20,10,25,8],"barWidth":"40%","animationDuration":1200,"animationEasing":"cubicInOut"}]}'></div>
 
-Donut chart example (Replace "#HEX..." placeholders with the exact hex colors from your theme):
-<div id="chart-2" class="echarts-chart" data-option='{"color":["#HEX1","#HEX2","#HEX3","#HEX4"],"backgroundColor":"transparent","tooltip":{"trigger":"item"},"legend":{"bottom":10,"textStyle":{"color":"#HEX_MUTED"}},"series":[{"type":"pie","radius":["40%","70%"],"center":["50%","45%"],"data":[{"value":30,"name":"${pieCategories[0]}"},{"value":25,"name":"${pieCategories[1]}"},{"value":20,"name":"${pieCategories[2]}"},{"value":25,"name":"${pieCategories[3]}"}],"label":{"color":"#HEX_MAIN"},"animationDuration":1200,"animationEasing":"cubicInOut"}]}'></div>
+Donut chart example:
+<div id="chart-2" class="echarts-chart" data-option='{"color":["${palette.primary}","${palette.secondary}","${palette.accent}","${palette.slideMuted}"],"backgroundColor":"transparent","tooltip":{"trigger":"item"},"legend":{"bottom":10,"textStyle":{"color":"${palette.slideMuted}"}},"series":[{"type":"pie","radius":["40%","70%"],"center":["50%","45%"],"data":[{"value":30,"name":"${pieCategories[0]}"},{"value":25,"name":"${pieCategories[1]}"},{"value":20,"name":"${pieCategories[2]}"},{"value":25,"name":"${pieCategories[3]}"}],"label":{"color":"${palette.slideText}"},"animationDuration":1200,"animationEasing":"cubicInOut"}]}'></div>
 
-Line chart example (Replace "#HEX..." placeholders with the exact hex colors from your theme):
-<div id="chart-3" class="echarts-chart" data-option='{"color":["#HEX1","#HEX2","#HEX3"],"backgroundColor":"transparent","tooltip":{"trigger":"axis"},"grid":{"top":40,"bottom":30,"left":60,"right":20},"xAxis":{"type":"category","data":${JSON.stringify(weekLabels)},"axisLine":{"lineStyle":{"color":"#HEX_MUTED"}},"axisLabel":{"color":"#HEX_MUTED"}},"yAxis":{"splitLine":{"lineStyle":{"color":"rgba(128,128,128,0.2)"}},"axisLabel":{"color":"#HEX_MUTED"}},"series":[{"type":"line","smooth":true,"areaStyle":{"opacity":0.15},"data":[50,120,200,350,500,800],"animationDuration":1200,"animationEasing":"cubicInOut"}]}'></div>
+Line chart example:
+<div id="chart-3" class="echarts-chart" data-option='{"color":["${palette.primary}","${palette.secondary}","${palette.accent}"],"backgroundColor":"transparent","tooltip":{"trigger":"axis"},"grid":{"top":40,"bottom":30,"left":60,"right":20},"xAxis":{"type":"category","data":${JSON.stringify(weekLabels)},"axisLine":{"lineStyle":{"color":"${palette.slideMuted}"}},"axisLabel":{"color":"${palette.slideMuted}"}},"yAxis":{"splitLine":{"lineStyle":{"color":"rgba(128,128,128,0.2)"}},"axisLabel":{"color":"${palette.slideMuted}"}},"series":[{"type":"line","smooth":true,"areaStyle":{"opacity":0.15},"data":[50,120,200,350,500,800],"animationDuration":1200,"animationEasing":"cubicInOut"}]}'></div>
 
 Two-chart layout example:
 <div class="chart-row">
@@ -231,11 +174,13 @@ function buildRetryConstraint(language: string): string {
 async function generateMarpMarkdown(
   prompt: string,
   language: string,
+  templateCss: string,
+  palette: Palette,
   extraConstraint?: string
 ): Promise<{ text: string; finishReason: string }> {
   const { text, finishReason } = await generate("medium", prompt, {
     maxOutputTokens: 10000,
-    system: [buildBaseSystemPrompt(language), extraConstraint].filter(Boolean).join("\n\n"),
+    system: [buildBaseSystemPrompt(language, templateCss, palette), extraConstraint].filter(Boolean).join("\n\n"),
   });
 
   return {
@@ -261,7 +206,11 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { prompt, language } = body as { prompt?: string; language?: string };
+  const { prompt, language, templateValues } = body as {
+    prompt?: string;
+    language?: string;
+    templateValues?: unknown;
+  };
 
   if (typeof prompt !== "string" || prompt.trim() === "") {
     return Response.json({ error: "prompt is required" }, { status: 400 });
@@ -272,11 +221,16 @@ export async function POST(req: Request) {
   const trimmedPrompt = prompt.trim();
   const basePrompt = `Create a Marp Markdown slide deck in ${outputLanguage} based on the following event description:\n\n${trimmedPrompt}`;
 
+  const resolvedValues: TemplateValues = isValidTemplateValues(templateValues)
+    ? templateValues
+    : DEFAULT_TEMPLATE_VALUES;
+  const { style: templateCss, palette } = buildDynamicStyle(resolvedValues);
+
   let markdown: string;
   let slideCount: number;
 
   try {
-    const { text, finishReason } = await generateMarpMarkdown(basePrompt, outputLanguage);
+    const { text, finishReason } = await generateMarpMarkdown(basePrompt, outputLanguage, templateCss, palette);
 
     if (finishReason === "length") {
       return Response.json(
@@ -289,12 +243,15 @@ export async function POST(req: Request) {
     }
 
     markdown = extractMarkdown(text);
+    markdown = replaceMarkdownStyle(markdown, templateCss);
     slideCount = countMarpSlides(markdown);
 
     if (slideCount < 6) {
       const retry = await generateMarpMarkdown(
         basePrompt,
         outputLanguage,
+        templateCss,
+        palette,
         buildRetryConstraint(outputLanguage)
       );
 
@@ -309,6 +266,7 @@ export async function POST(req: Request) {
       }
 
       markdown = extractMarkdown(retry.text);
+      markdown = replaceMarkdownStyle(markdown, templateCss);
       slideCount = countMarpSlides(markdown);
     }
   } catch (error) {

@@ -72,7 +72,6 @@ export function SidebarControls({
   onPresetInputChange,
 }: SidebarControlsProps) {
   const accentHex = PRIMARY_COLOR_HEX[state.primaryColor.value];
-  const presetErrorId = "preset-shortcode-error";
 
   return (
     <aside className="h-full w-[372px] shrink-0 overflow-hidden rounded-2xl border border-border bg-background text-foreground">
@@ -91,12 +90,11 @@ export function SidebarControls({
           {TEMPLATE_KEYS.map((key) => {
             const row = state[key];
             const options = TEMPLATE_OPTIONS[key];
-            const labelId = `template-label-${key}`;
 
             return (
               <div key={key} className="space-y-2.5 rounded-xl border border-border bg-card/70 p-4">
                 <div className="flex items-center justify-between">
-                  <p id={labelId} className="text-sm font-medium text-foreground">{TEMPLATE_LABELS[key]}</p>
+                  <p className="text-sm font-medium text-card-foreground">{TEMPLATE_LABELS[key]}</p>
                   <span
                     className="rounded-full border px-2 py-0.5 text-[11px]"
                     style={
@@ -124,10 +122,7 @@ export function SidebarControls({
                     }
                     value={String(row.value)}
                   >
-                    <SelectTrigger
-                      aria-labelledby={labelId}
-                      className="w-full border-border bg-card text-card-foreground focus-visible:ring-ring/40"
-                    >
+                    <SelectTrigger className="w-full border-input bg-card text-card-foreground focus-visible:ring-ring/40">
                       <SelectValue placeholder="Select value" />
                     </SelectTrigger>
                     <SelectContent>
@@ -175,25 +170,17 @@ export function SidebarControls({
           </Button>
 
           <div className="space-y-2">
-            <div
-              className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground"
-              id="preset-shortcode-label"
-            >
+            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">
               <IconSparkles size={14} />
-              Preset Shortcode
+              <label htmlFor="sidebar-preset-input">Preset Shortcode</label>
             </div>
             <Input
-              aria-labelledby="preset-shortcode-label"
-              aria-describedby={presetError ? presetErrorId : undefined}
-              className="h-10 border-border bg-card font-mono text-card-foreground"
+              id="sidebar-preset-input"
+              className="h-10 border-input bg-card font-mono text-card-foreground"
               onChange={(event) => onPresetInputChange(event.target.value)}
               value={presetInput}
             />
-            {presetError ? (
-              <p id={presetErrorId} className="text-xs text-destructive" role="alert">
-                {presetError}
-              </p>
-            ) : null}
+            {presetError ? <p className="text-xs text-rose-300">{presetError}</p> : null}
           </div>
         </div>
       </div>

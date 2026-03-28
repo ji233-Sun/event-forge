@@ -246,13 +246,34 @@ export const mediaGenerationVariantRelations = relations(mediaGenerationVariant,
   }),
 }));
 
+type ImageSlideJsonb = {
+  index: number
+  title: string
+  imagePrompt: string
+  url?: string
+}
+
+type TemplateValuesJsonb = {
+  themeMode: string
+  baseColor: string
+  primaryColor: string
+  bgStyle: string
+  headingFont: string
+  bodyFont: string
+  cardStyle: string
+  borderRadius: string
+}
+
 export const deck = pgTable(
   "deck",
   {
     id: text("id").primaryKey(),
     title: text("title").notNull(),
     prompt: text("prompt").notNull(),
-    markdown: text("markdown").notNull(),
+    mode: text("mode").notNull().default("marp"),
+    markdown: text("markdown"),
+    images: jsonb("images").$type<ImageSlideJsonb[] | null>(),
+    templateValues: jsonb("template_values").$type<TemplateValuesJsonb | null>(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
