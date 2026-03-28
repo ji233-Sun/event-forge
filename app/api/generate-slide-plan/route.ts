@@ -1,15 +1,12 @@
 import { generate } from '@/lib/ai'
 import { auth } from '@/lib/auth'
+import { isPlainObject } from '@/lib/api-utils'
 import { headers } from 'next/headers'
 
 type SlidePlan = {
   index: number
   title: string
   imagePrompt: string
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function extractJson(text: string): unknown {
@@ -19,8 +16,7 @@ function extractJson(text: string): unknown {
   return JSON.parse(raw)
 }
 
-function buildSystemPrompt(): string {
-  return `You are a presentation designer. Plan a visual image slide deck based on the event description.
+const SYSTEM_PROMPT = `You are a presentation designer. Plan a visual image slide deck based on the event description.
 
 Return ONLY a valid JSON object — no other text, no markdown fences, no explanation:
 {
@@ -46,7 +42,6 @@ Rules:
   * Decorative elements if appropriate (geometric shapes, gradients, icons as simple objects)
 - title is short for the navigation strip only
 - Do NOT include any text outside the JSON object`
-}
 
 export async function POST(req: Request) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -77,7 +72,7 @@ export async function POST(req: Request) {
     const { text, finishReason } = await generate(
       'medium',
       `Plan a visual image slide deck for the following event:\n\n${prompt.trim()}`,
-      { system: buildSystemPrompt() },
+      { system: SYSTEM_PROMPT },
     )
 
     if (String(finishReason) === 'length') {
@@ -102,9 +97,20 @@ export async function POST(req: Request) {
     return Response.json({ error: 'AI generation failed. Try again.' }, { status: 502 })
   }
 
-  if (slides.length < 6) {
+  if (slides.length < 6 || slides.length > 10) {
     return Response.json(
-      { error: 'Model returned fewer than 6 slides. Please retry.' },
+      { error: 'Model returned an invalid number of slides (expected 6–10). Please retry.' },
+      { status: 502 },
+    )
+  }
+
+  // Validate individual slide shape
+  const invalidSlide = slides.find(
+    (s) => typeof s.title !== 'string' || typeof s.imagePrompt !== 'string' || typeof s.index !== 'number',
+  )
+  if (invalidSlide) {
+    return Response.json(
+      { error: 'Model returned malformed slide data. Please retry.' },
       { status: 502 },
     )
   }

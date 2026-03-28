@@ -115,4 +115,34 @@ describe('POST /api/generate-slide-plan', () => {
     const res = await POST(req)
     expect(res.status).toBe(502)
   })
+
+  it('returns 502 when model output is truncated', async () => {
+    mockGetSession.mockResolvedValue(authedSession)
+    mockGenerate.mockResolvedValueOnce({
+      text: '{"slides": []}',
+      finishReason: 'length',
+    })
+    const req = new Request('http://localhost/api/generate-slide-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'A festival' }),
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(502)
+  })
+
+  it('returns 502 when model returns malformed JSON', async () => {
+    mockGetSession.mockResolvedValue(authedSession)
+    mockGenerate.mockResolvedValueOnce({
+      text: 'not valid json at all',
+      finishReason: 'stop',
+    })
+    const req = new Request('http://localhost/api/generate-slide-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'A festival' }),
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(502)
+  })
 })

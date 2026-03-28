@@ -1,11 +1,8 @@
 import Marp from "@marp-team/marp-core";
 import { generate } from "@/lib/ai";
 import { auth } from "@/lib/auth";
+import { isPlainObject } from "@/lib/api-utils";
 import { headers } from "next/headers";
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function extractMarkdown(text: string): string {
   const mdCodeBlockMatch = text.match(/```(?:markdown|md)?\s*([\s\S]*?)```/i);

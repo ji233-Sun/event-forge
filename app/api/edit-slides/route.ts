@@ -1,6 +1,7 @@
 import Marp from "@marp-team/marp-core";
 import { generate } from "@/lib/ai";
 import { auth } from "@/lib/auth";
+import { isPlainObject } from "@/lib/api-utils";
 import { parseSlides, joinSlides } from "@/lib/slides";
 import { headers } from "next/headers";
 
@@ -23,10 +24,6 @@ ECharts：保持 data-option 为合法 JSON，backgroundColor 为 "transparent"�
 不要修改 Marp front-matter（开头的 --- YAML 块）。
 仅修改被要求的内容，保持整体 Marp Markdown 格式。
 输出纯 Markdown，不要用代码块包裹，不要任何说明文字。`;
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 export async function POST(req: Request) {
   const session = await auth.api.getSession({
