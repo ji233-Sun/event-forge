@@ -49,3 +49,5 @@ export function stream(
   }
   return streamText(params)
 }
+
+export { imageModel, generateImage } from './image'
