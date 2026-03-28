@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { SlidePreview, type SlidePreviewHandle } from '@/components/slide-preview'
 import { ThumbnailStrip } from '@/components/slide-studio/thumbnail-strip'
 import { EditPanel } from '@/components/slide-studio/edit-panel'
+import { StylePanel } from '@/components/slide-studio/style-panel'
 import { parseSlides, getSlideTitle } from '@/lib/slides'
 import {
   saveDeck,
@@ -19,6 +20,15 @@ import { ImageGeneratingScreen } from '@/components/slide-studio/image-generatin
 import { ImageStudioView } from '@/components/slide-studio/image-studio-view'
 import type { ImageSlideState } from '@/components/slide-studio/image-types'
 import {
+  createInitialTemplateStoreState,
+  getTemplateValues,
+  setTemplateValue,
+  shuffleTemplateState,
+  toggleTemplateLock,
+  type TemplateStoreState,
+} from '@/lib/slides/template/store'
+import type { TemplateKey, TemplateValues } from '@/lib/slides/template/config'
+import {
   IconSparkles,
   IconLoader2,
   IconDice,
@@ -26,6 +36,9 @@ import {
   IconPresentation,
   IconTrash,
   IconClock,
+  IconChevronDown,
+  IconChevronUp,
+  IconPalette,
 } from '@tabler/icons-react'
 
 type Phase = 'input' | 'generating' | 'studio' | 'image-generating' | 'image-studio'
@@ -63,6 +76,14 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const [editLoading, setEditLoading] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
 
+  const [templateState, setTemplateState] = useState<TemplateStoreState>(
+    () => createInitialTemplateStoreState()
+  )
+  const [styleExpanded, setStyleExpanded] = useState(false)
+  const [activeTab, setActiveTab] = useState<'edit' | 'style'>('edit')
+  const [isRestyling, setIsRestyling] = useState(false)
+  const [restyleError, setRestyleError] = useState<string | null>(null)
+
   const [decks, setDecks] = useState(initialDecks)
   const [loadingDeckId, setLoadingDeckId] = useState<string | null>(null)
 
@@ -83,7 +104,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       const res = await fetch('/api/generate-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, templateValues: getTemplateValues(templateState) }),
       })
 
       if (!res.ok) {
@@ -257,6 +278,58 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     [session, deckId],
   )
 
+  const handleTemplateValueChange = useCallback(
+    <K extends TemplateKey>(key: K, value: TemplateValues[K]) => {
+      setTemplateState((prev) => setTemplateValue(prev, key, value))
+    },
+    []
+  )
+
+  const handleToggleLock = useCallback((key: TemplateKey) => {
+    setTemplateState((prev) => toggleTemplateLock(prev, key))
+  }, [])
+
+  const handlePreGenShuffle = useCallback(() => {
+    setTemplateState((prev) => shuffleTemplateState(prev))
+  }, [])
+
+  const handleShuffle = useCallback(async () => {
+    if (!session) return
+    const newState = shuffleTemplateState(templateState)
+    setTemplateState(newState)
+    setIsRestyling(true)
+    setRestyleError(null)
+
+    try {
+      const res = await fetch('/api/restyle-slides', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          markdown: session.markdown,
+          templateValues: getTemplateValues(newState),
+        }),
+      })
+
+      if (!res.ok) {
+        let message = 'Restyle failed'
+        try {
+          const err = (await res.json()) as { error?: string }
+          message = err.error ?? message
+        } catch { /* */ }
+        throw new Error(message)
+      }
+
+      const data = (await res.json()) as { html?: string; css?: string; markdown?: string }
+      if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
+      if (deckId) await updateDeckMarkdown(deckId, data.markdown)
+      setSession({ html: data.html, css: data.css, markdown: data.markdown })
+    } catch (e) {
+      setRestyleError(e instanceof Error ? e.message : 'Restyle failed')
+    } finally {
+      setIsRestyling(false)
+    }
+  }, [session, templateState, deckId])
+
   // ── Retry single image slide ──────────────────────────────────────────
   async function handleRetrySlide(index: number) {
     const slideState = imageSlideStates.find((s) => s.index === index)
@@ -418,13 +491,55 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
               />
             )}
           </main>
-          <aside className="w-80 shrink-0 overflow-y-auto border-l">
-            <EditPanel
-              currentSlideNumber={currentSlideIndex + 1}
-              onEdit={handleEdit}
-              isLoading={editLoading}
-              error={editError}
-            />
+          <aside className="w-80 shrink-0 overflow-y-auto border-l flex flex-col">
+            {/* Tab bar */}
+            <div className="flex shrink-0 border-b">
+              <button
+                type="button"
+                onClick={() => setActiveTab('edit')}
+                className={[
+                  'flex-1 px-3 py-2.5 text-xs font-medium transition-colors',
+                  activeTab === 'edit'
+                    ? 'border-b-2 border-primary text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                ].join(' ')}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('style')}
+                className={[
+                  'flex-1 px-3 py-2.5 text-xs font-medium transition-colors',
+                  activeTab === 'style'
+                    ? 'border-b-2 border-primary text-foreground'
+                    : 'text-muted-foreground hover:text-foreground',
+                ].join(' ')}
+              >
+                Style
+              </button>
+            </div>
+
+            {/* Tab content */}
+            <div className="flex-1 overflow-y-auto">
+              {activeTab === 'edit' ? (
+                <EditPanel
+                  currentSlideNumber={currentSlideIndex + 1}
+                  onEdit={handleEdit}
+                  isLoading={editLoading}
+                  error={editError}
+                />
+              ) : (
+                <StylePanel
+                  state={templateState}
+                  isLoading={isRestyling}
+                  error={restyleError}
+                  onValueChange={handleTemplateValueChange}
+                  onToggleLock={handleToggleLock}
+                  onShuffle={handleShuffle}
+                />
+              )}
+            </div>
           </aside>
         </div>
       </div>
@@ -504,6 +619,35 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
                 Image
               </button>
             </div>
+          </div>
+
+          {/* Collapsible Style section */}
+          <div className="rounded-md border border-border/50">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors"
+              onClick={() => setStyleExpanded((v) => !v)}
+            >
+              <span className="flex items-center gap-2">
+                <IconPalette size={16} className="text-muted-foreground" />
+                Style Template
+              </span>
+              {styleExpanded ? (
+                <IconChevronUp size={16} className="text-muted-foreground" />
+              ) : (
+                <IconChevronDown size={16} className="text-muted-foreground" />
+              )}
+            </button>
+            {styleExpanded && (
+              <div className="border-t">
+                <StylePanel
+                  state={templateState}
+                  onValueChange={handleTemplateValueChange}
+                  onToggleLock={handleToggleLock}
+                  onShuffle={handlePreGenShuffle}
+                />
+              </div>
+            )}
           </div>
         </div>
 
