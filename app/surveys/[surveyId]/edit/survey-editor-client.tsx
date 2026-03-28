@@ -40,8 +40,8 @@ export function SurveyEditorClient({
   initialSurvey: SurveyEditorState
 }) {
   const router = useRouter()
-  const [title] = useState(initialSurvey.title)
-  const [description] = useState(initialSurvey.description)
+  const title = initialSurvey.title
+  const description = initialSurvey.description
   const [questions, setQuestions] = useState<QuestionData[]>(initialSurvey.questions)
   const [saving, setSaving] = useState(false)
   const [publishing, setPublishing] = useState(false)
