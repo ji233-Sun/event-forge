@@ -18,6 +18,7 @@ import {
 import type { DeckSummary, SlideMode, ImageSlide } from './actions'
 import { ImageGeneratingScreen } from '@/components/slide-studio/image-generating-screen'
 import { ImageStudioView } from '@/components/slide-studio/image-studio-view'
+import { StylePickerScreen } from '@/components/slide-studio/style-picker-screen'
 import type { ImageSlideState } from '@/components/slide-studio/image-types'
 import {
   createInitialTemplateStoreState,
@@ -36,12 +37,9 @@ import {
   IconPresentation,
   IconTrash,
   IconClock,
-  IconChevronDown,
-  IconChevronUp,
-  IconPalette,
 } from '@tabler/icons-react'
 
-type Phase = 'input' | 'generating' | 'studio' | 'image-generating' | 'image-studio'
+type Phase = 'input' | 'style-pick' | 'generating' | 'studio' | 'image-generating' | 'image-studio'
 
 interface SlideSession {
   markdown: string
@@ -79,7 +77,6 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const [templateState, setTemplateState] = useState<TemplateStoreState>(
     () => createInitialTemplateStoreState()
   )
-  const [styleExpanded, setStyleExpanded] = useState(false)
   const [activeTab, setActiveTab] = useState<'edit' | 'style'>('edit')
   const [isRestyling, setIsRestyling] = useState(false)
   const [restyleError, setRestyleError] = useState<string | null>(null)
@@ -403,6 +400,21 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const slides = session ? parseSlides(session.markdown) : []
   const titles = slides.map((seg, i) => getSlideTitle(seg, `Slide ${i + 1}`))
 
+  // ── Render: Style Pick ────────────────────────────────────────────────
+  if (phase === 'style-pick') {
+    return (
+      <StylePickerScreen
+        prompt={prompt}
+        templateState={templateState}
+        onValueChange={handleTemplateValueChange}
+        onToggleLock={handleToggleLock}
+        onShuffle={handlePreGenShuffle}
+        onBack={() => setPhase('input')}
+        onGenerate={handleGenerate}
+      />
+    )
+  }
+
   // ── Render: Generating ────────────────────────────────────────────────
   if (phase === 'generating') {
     return (
@@ -580,7 +592,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           />
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              onClick={slideMode === 'marp' ? handleGenerate : handleGenerateImages}
+              onClick={slideMode === 'marp' ? () => { if (prompt.trim()) setPhase('style-pick') } : handleGenerateImages}
               disabled={!prompt.trim()}
             >
               <IconSparkles className="mr-1 size-4" />
@@ -621,34 +633,6 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             </div>
           </div>
 
-          {/* Collapsible Style section */}
-          <div className="rounded-md border border-border/50">
-            <button
-              type="button"
-              className="flex w-full items-center justify-between px-4 py-3 text-sm font-medium hover:bg-muted/50 transition-colors"
-              onClick={() => setStyleExpanded((v) => !v)}
-            >
-              <span className="flex items-center gap-2">
-                <IconPalette size={16} className="text-muted-foreground" />
-                Style Template
-              </span>
-              {styleExpanded ? (
-                <IconChevronUp size={16} className="text-muted-foreground" />
-              ) : (
-                <IconChevronDown size={16} className="text-muted-foreground" />
-              )}
-            </button>
-            {styleExpanded && (
-              <div className="border-t">
-                <StylePanel
-                  state={templateState}
-                  onValueChange={handleTemplateValueChange}
-                  onToggleLock={handleToggleLock}
-                  onShuffle={handlePreGenShuffle}
-                />
-              </div>
-            )}
-          </div>
         </div>
 
         {/* History */}
