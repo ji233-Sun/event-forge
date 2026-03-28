@@ -1,6 +1,6 @@
 import Marp from "@marp-team/marp-core";
 import { isPlainObject } from "@/lib/api-utils";
-import { buildDynamicStyle, replaceMarkdownStyle } from "@/lib/slides/template/css-builder";
+import { buildDynamicStyle, replaceEChartsColors, replaceMarkdownStyle } from "@/lib/slides/template/css-builder";
 import { DEFAULT_TEMPLATE_VALUES, type TemplateValues } from "@/lib/slides/template/config";
 
 function isValidTemplateValues(v: unknown): v is TemplateValues {
@@ -24,9 +24,10 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { markdown, templateValues } = body as {
+  const { markdown, templateValues, prevTemplateValues } = body as {
     markdown?: unknown;
     templateValues?: unknown;
+    prevTemplateValues?: unknown;
   };
 
   if (typeof markdown !== "string" || markdown.trim() === "") {
@@ -37,8 +38,13 @@ export async function POST(req: Request) {
     ? templateValues
     : DEFAULT_TEMPLATE_VALUES;
 
-  const { style } = buildDynamicStyle(values);
-  const restyled = replaceMarkdownStyle(markdown, style);
+  const { style: newStyle, palette: newPalette } = buildDynamicStyle(values);
+  const { palette: oldPalette } = buildDynamicStyle(
+    isValidTemplateValues(prevTemplateValues) ? prevTemplateValues : values
+  );
+
+  let restyled = replaceMarkdownStyle(markdown, newStyle);
+  restyled = replaceEChartsColors(restyled, oldPalette, newPalette);
 
   let html: string;
   let css: string;

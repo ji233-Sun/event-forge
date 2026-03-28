@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { IconArrowLeft, IconSparkles } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
-import { MarpPreview } from "@/app/slides-test/_components/marp-preview";
+import { SlideDeckPreview } from "./slide-deck-preview";
 import { getTemplateValues } from "@/lib/slides/template/store";
 import type { TemplateStoreState } from "@/lib/slides/template/store";
 import type { TemplateKey, TemplateValues } from "@/lib/slides/template/config";
@@ -15,6 +15,7 @@ type StylePickerScreenProps = {
   onValueChange: <K extends TemplateKey>(key: K, value: TemplateValues[K]) => void;
   onToggleLock: (key: TemplateKey) => void;
   onShuffle: () => void;
+  onPresetApply: (values: TemplateValues) => void;
   onBack: () => void;
   onGenerate: () => void;
 };
@@ -25,6 +26,7 @@ export function StylePickerScreen({
   onValueChange,
   onToggleLock,
   onShuffle,
+  onPresetApply,
   onBack,
   onGenerate,
 }: StylePickerScreenProps) {
@@ -56,12 +58,13 @@ export function StylePickerScreen({
             onValueChange={onValueChange}
             onToggleLock={onToggleLock}
             onShuffle={onShuffle}
+            onPresetApply={onPresetApply}
           />
         </aside>
 
         {/* Slide preview */}
-        <main className="min-h-0 flex-1 p-6">
-          <MarpPreview values={values} />
+        <main className="min-h-0 flex-1">
+          <SlideDeckPreview values={values} />
         </main>
       </div>
     </div>

@@ -199,6 +199,34 @@ ${cardCss(values.cardStyle, palette)}`;
 }
 
 /**
+ * Replace literal ECharts palette hex colors inside `data-option='...'` attributes.
+ * Scans for hex color literals matching old palette values and substitutes new ones.
+ * Replacement is done in a single pass per attribute to avoid transitive collisions.
+ */
+export function replaceEChartsColors(
+  markdown: string,
+  oldPalette: Palette,
+  newPalette: Palette,
+): string {
+  // Build case-insensitive map: lowercase old hex → new hex
+  const map = new Map<string, string>();
+  for (const key of Object.keys(oldPalette) as Array<keyof Palette>) {
+    const oldColor = oldPalette[key];
+    const newColor = newPalette[key];
+    if (oldColor && newColor && oldColor.toLowerCase() !== newColor.toLowerCase()) {
+      map.set(oldColor.toLowerCase(), newColor);
+    }
+  }
+  if (map.size === 0) return markdown;
+
+  // Replace only within data-option='...' attribute values (single-quoted)
+  return markdown.replace(/data-option='([^']*)'/g, (_, json: string) => {
+    const updated = json.replace(/#[0-9a-fA-F]{6}/g, (hex) => map.get(hex.toLowerCase()) ?? hex);
+    return `data-option='${updated}'`;
+  });
+}
+
+/**
  * Replace the `style: |` block in a Marp front-matter with new CSS.
  * Leaves the front-matter closing `---` and all slide content untouched.
  */

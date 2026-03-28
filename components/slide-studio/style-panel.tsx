@@ -1,7 +1,9 @@
 "use client";
 
-import { IconLock, IconLockOpen2, IconRefresh } from "@tabler/icons-react";
+import { useEffect, useMemo, useState } from "react";
+import { IconLock, IconLockOpen2, IconRefresh, IconSparkles } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -16,7 +18,9 @@ import {
   type TemplateKey,
   type TemplateValues,
 } from "@/lib/slides/template/config";
+import { getTemplateValues } from "@/lib/slides/template/store";
 import type { TemplateStoreState } from "@/lib/slides/template/store";
+import { decodePreset, encodePreset, formatPresetCode } from "@/lib/slides/template/codec";
 
 type StylePanelProps = {
   state: TemplateStoreState;
@@ -25,6 +29,7 @@ type StylePanelProps = {
   onValueChange: <K extends TemplateKey>(key: K, value: TemplateValues[K]) => void;
   onToggleLock: (key: TemplateKey) => void;
   onShuffle: () => void;
+  onPresetApply?: (values: TemplateValues) => void;
 };
 
 export function StylePanel({
@@ -34,7 +39,34 @@ export function StylePanel({
   onValueChange,
   onToggleLock,
   onShuffle,
+  onPresetApply,
 }: StylePanelProps) {
+  const currentValues = useMemo(() => getTemplateValues(state), [state]);
+  const presetCode = useMemo(() => encodePreset(currentValues), [currentValues]);
+  const [presetInput, setPresetInput] = useState(() => formatPresetCode(presetCode));
+  const [presetError, setPresetError] = useState<string | null>(null);
+
+  // Keep input in sync when values change externally (shuffle, select)
+  useEffect(() => {
+    setPresetInput(formatPresetCode(presetCode));
+    setPresetError(null);
+  }, [presetCode]);
+
+  const handlePresetInputChange = (value: string) => {
+    setPresetInput(value);
+    if (!value.trim() || /^--preset\s*$/i.test(value.trim())) {
+      setPresetError(null);
+      return;
+    }
+    const parsed = decodePreset(value);
+    if (parsed) {
+      setPresetError(null);
+      onPresetApply?.(parsed);
+    } else {
+      setPresetError("Invalid preset shortcode");
+    }
+  };
+
   return (
     <div className="space-y-3 p-4">
       {error ? (
@@ -102,6 +134,23 @@ export function StylePanel({
         <IconRefresh size={14} className={isLoading ? "animate-spin mr-1.5" : "mr-1.5"} />
         {isLoading ? "Restyling..." : "Shuffle"}
       </Button>
+
+      <div className="space-y-1.5 border-t pt-3">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+          <IconSparkles size={12} />
+          Preset Code
+        </p>
+        <Input
+          className="h-7 font-mono text-xs"
+          value={presetInput}
+          onChange={(e) => handlePresetInputChange(e.target.value)}
+          disabled={isLoading}
+          spellCheck={false}
+        />
+        {presetError && (
+          <p className="text-xs text-destructive">{presetError}</p>
+        )}
+      </div>
     </div>
   );
 }

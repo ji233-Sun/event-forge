@@ -28,7 +28,7 @@ import {
   toggleTemplateLock,
   type TemplateStoreState,
 } from '@/lib/slides/template/store'
-import type { TemplateKey, TemplateValues } from '@/lib/slides/template/config'
+import { TEMPLATE_KEYS, type TemplateKey, type TemplateValues } from '@/lib/slides/template/config'
 import {
   IconSparkles,
   IconLoader2,
@@ -290,32 +290,26 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     setTemplateState((prev) => shuffleTemplateState(prev))
   }, [])
 
-  const handleShuffle = useCallback(async () => {
+  // Shared restyle helper: replaces CSS + ECharts colors, updates session + DB
+  const handleRestyle = useCallback(async (prevValues: TemplateValues, newValues: TemplateValues) => {
     if (!session) return
-    const newState = shuffleTemplateState(templateState)
-    setTemplateState(newState)
     setIsRestyling(true)
     setRestyleError(null)
-
     try {
       const res = await fetch('/api/restyle-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           markdown: session.markdown,
-          templateValues: getTemplateValues(newState),
+          prevTemplateValues: prevValues,
+          templateValues: newValues,
         }),
       })
-
       if (!res.ok) {
         let message = 'Restyle failed'
-        try {
-          const err = (await res.json()) as { error?: string }
-          message = err.error ?? message
-        } catch { /* */ }
+        try { const err = (await res.json()) as { error?: string }; message = err.error ?? message } catch { /* */ }
         throw new Error(message)
       }
-
       const data = (await res.json()) as { html?: string; css?: string; markdown?: string }
       if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
       if (deckId) await updateDeckMarkdown(deckId, data.markdown)
@@ -325,7 +319,34 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     } finally {
       setIsRestyling(false)
     }
-  }, [session, templateState, deckId])
+  }, [session, deckId])
+
+  const handleShuffle = useCallback(() => {
+    const prevValues = getTemplateValues(templateState)
+    const newState = shuffleTemplateState(templateState)
+    setTemplateState(newState)
+    void handleRestyle(prevValues, getTemplateValues(newState))
+  }, [templateState, handleRestyle])
+
+  // Apply a decoded preset in Studio: restyle with ECharts color replacement
+  const handleStudioPresetApply = useCallback((newValues: TemplateValues) => {
+    const prevValues = getTemplateValues(templateState)
+    setTemplateState((prev) => {
+      return Object.fromEntries(
+        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }])
+      ) as TemplateStoreState
+    })
+    void handleRestyle(prevValues, newValues)
+  }, [templateState, handleRestyle])
+
+  // Apply a decoded preset in style-pick phase: no API call, preview auto-updates
+  const handlePreGenPresetApply = useCallback((newValues: TemplateValues) => {
+    setTemplateState((prev) => {
+      return Object.fromEntries(
+        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }])
+      ) as TemplateStoreState
+    })
+  }, [])
 
   // ── Retry single image slide ──────────────────────────────────────────
   async function handleRetrySlide(index: number) {
@@ -403,15 +424,18 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   // ── Render: Style Pick ────────────────────────────────────────────────
   if (phase === 'style-pick') {
     return (
-      <StylePickerScreen
-        prompt={prompt}
-        templateState={templateState}
-        onValueChange={handleTemplateValueChange}
-        onToggleLock={handleToggleLock}
-        onShuffle={handlePreGenShuffle}
-        onBack={() => setPhase('input')}
-        onGenerate={handleGenerate}
-      />
+      <div className="flex h-[calc(100vh-3rem)] flex-col overflow-hidden">
+        <StylePickerScreen
+          prompt={prompt}
+          templateState={templateState}
+          onValueChange={handleTemplateValueChange}
+          onToggleLock={handleToggleLock}
+          onShuffle={handlePreGenShuffle}
+          onPresetApply={handlePreGenPresetApply}
+          onBack={() => setPhase('input')}
+          onGenerate={handleGenerate}
+        />
+      </div>
     )
   }
 
@@ -549,6 +573,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
                   onValueChange={handleTemplateValueChange}
                   onToggleLock={handleToggleLock}
                   onShuffle={handleShuffle}
+                  onPresetApply={handleStudioPresetApply}
                 />
               )}
             </div>
