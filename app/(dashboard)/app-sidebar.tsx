@@ -21,6 +21,7 @@ import {
   IconList,
   IconPlus,
   IconLogout,
+  IconUser,
 } from '@tabler/icons-react'
 import { authClient } from '@/lib/auth-client'
 
@@ -85,6 +86,14 @@ export function AppSidebar({ user }: { user: User }) {
                   <Link href="/surveys/new">
                     <IconPlus size={18} />
                     <span>Create Survey</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/profile'}>
+                  <Link href="/profile">
+                    <IconUser size={18} />
+                    <span>Profile</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
