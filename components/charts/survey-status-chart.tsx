@@ -10,10 +10,16 @@ echarts.use([PieChart, TooltipComponent, LegendComponent, GraphicComponent, Canv
 
 type StatusData = { draft: number; published: number; closed: number }
 
-/** Read a CSS variable's computed color value from :root */
+const _colorEl = typeof document !== 'undefined' ? document.createElement('div') : null
+
+/** Resolve a CSS variable to an rgb() string that echarts can parse */
 function resolveColor(varName: string): string {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(varName).trim()
-  return raw || 'currentColor'
+  if (!_colorEl) return '#000000'
+  _colorEl.style.color = `var(${varName})`
+  document.documentElement.appendChild(_colorEl)
+  const computed = getComputedStyle(_colorEl).color
+  _colorEl.remove()
+  return computed || '#000000'
 }
 
 export function SurveyStatusChart({ data }: { data: StatusData }) {

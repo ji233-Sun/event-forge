@@ -11,6 +11,7 @@
 !.yarn/versions
 docs/superpowers
 .claude
+.superpowers
 
 # testing
 /coverage

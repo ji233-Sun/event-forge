@@ -54,6 +54,7 @@ export const SlidePreview = forwardRef<SlidePreviewHandle, SlidePreviewProps>(
           ref={iframeRef}
           title="Slide Studio Viewer"
           srcDoc={fullDoc}
+          sandbox="allow-scripts"
           className="w-full h-full border-0"
         />
       </div>

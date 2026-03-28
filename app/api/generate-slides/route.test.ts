@@ -1,15 +1,29 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGenerate, mockRender } = vi.hoisted(() => ({
+const { mockGenerate, mockRender, mockGetSession, mockHeaders } = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
   mockRender: vi.fn(() => ({
     html: "<section>Rendered</section>",
     css: "section { color: red; }",
   })),
+  mockGetSession: vi.fn(),
+  mockHeaders: vi.fn(),
 }));
 
 vi.mock("@/lib/ai", () => ({
   generate: mockGenerate,
+}));
+
+vi.mock("@/lib/auth", () => ({
+  auth: {
+    api: {
+      getSession: mockGetSession,
+    },
+  },
+}));
+
+vi.mock("next/headers", () => ({
+  headers: mockHeaders,
 }));
 
 vi.mock("@marp-team/marp-core", () => ({
@@ -20,13 +34,21 @@ vi.mock("@marp-team/marp-core", () => ({
 
 import { POST } from "./route";
 
-afterEach(() => {
-  mockGenerate.mockReset();
-  mockRender.mockReset();
+// Initialize defaults before each test
+beforeEach(() => {
+  mockGetSession.mockResolvedValue({ user: { id: "user_123" } });
+  mockHeaders.mockResolvedValue(new Headers());
   mockRender.mockImplementation(() => ({
     html: "<section>Rendered</section>",
     css: "section { color: red; }",
   }));
+});
+
+afterEach(() => {
+  mockGenerate.mockReset();
+  mockRender.mockReset();
+  mockGetSession.mockReset();
+  mockHeaders.mockReset();
 });
 
 describe("POST /api/generate-slides", () => {
@@ -156,5 +178,54 @@ describe("POST /api/generate-slides", () => {
     await expect(response.json()).resolves.toEqual({
       error: "Failed to render generated slides. Try again.",
     });
+  });
+
+  it("uses DEFAULT_TEMPLATE_VALUES when templateValues is absent", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: "---\nmarp: true\ntheme: default\npaginate: true\nstyle: |\n  section{}\n---\n\n# One\n\n---\n# Two\n\n---\n# Three\n\n---\n# Four\n\n---\n# Five\n\n---\n# Six",
+      finishReason: "stop",
+    });
+
+    const req = new Request("http://localhost/api/generate-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "a campus festival" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    // CSS in the system prompt must come from buildDynamicStyle, not [GENERATE HEX]
+    expect(mockGenerate.mock.calls[0]?.[2]?.system).not.toContain("[GENERATE HEX]");
+    expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain("--color-primary:");
+  });
+
+  it("injects templateValues CSS into the system prompt", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: "---\nmarp: true\ntheme: default\npaginate: true\nstyle: |\n  section{}\n---\n\n# One\n\n---\n# Two\n\n---\n# Three\n\n---\n# Four\n\n---\n# Five\n\n---\n# Six",
+      finishReason: "stop",
+    });
+
+    const req = new Request("http://localhost/api/generate-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: "a campus festival",
+        templateValues: {
+          themeMode: "light",
+          baseColor: "neutral",
+          primaryColor: "rose",
+          bgStyle: "solid",
+          headingFont: "Inter",
+          bodyFont: "Roboto",
+          cardStyle: "flat",
+          borderRadius: "8px",
+        },
+      }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    // rose primary = #f43f5e
+    expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain("#f43f5e");
   });
 });

@@ -142,6 +142,7 @@ export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   surveys: many(survey),
+  decks: many(deck),
   mediaGenerations: many(mediaGeneration),
 }));
 
@@ -207,6 +208,53 @@ export const responseRelations = relations(response, ({ one }) => ({
 export const mediaGenerationRelations = relations(mediaGeneration, ({ one }) => ({
   user: one(user, {
     fields: [mediaGeneration.userId],
+    references: [user.id],
+  }),
+}));
+
+type ImageSlideJsonb = {
+  index: number
+  title: string
+  imagePrompt: string
+  url?: string
+}
+
+type TemplateValuesJsonb = {
+  themeMode: string
+  baseColor: string
+  primaryColor: string
+  bgStyle: string
+  headingFont: string
+  bodyFont: string
+  cardStyle: string
+  borderRadius: string
+}
+
+export const deck = pgTable(
+  "deck",
+  {
+    id: text("id").primaryKey(),
+    title: text("title").notNull(),
+    prompt: text("prompt").notNull(),
+    mode: text("mode").notNull().default("marp"),
+    markdown: text("markdown"),
+    images: jsonb("images").$type<ImageSlideJsonb[] | null>(),
+    templateValues: jsonb("template_values").$type<TemplateValuesJsonb | null>(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index("deck_userId_idx").on(table.userId, table.createdAt)],
+);
+
+export const deckRelations = relations(deck, ({ one }) => ({
+  user: one(user, {
+    fields: [deck.userId],
     references: [user.id],
   }),
 }));

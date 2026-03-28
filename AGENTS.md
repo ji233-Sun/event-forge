@@ -56,7 +56,7 @@ lib/db/auth-schema.ts           # DB tables (user, session, account, verificatio
 - Client calls (React components): import `authClient` from `@/lib/auth-client`
 - The Drizzle adapter uses `provider: 'pg'` with the schema passed explicitly — keep `schema` import in `lib/auth.ts`
 - `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` must be set in `.env`
-- To add auth plugins (e.g. OAuth, 2FA), extend `lib/auth.ts` and re-run `npx auth@latest generate` to update the schema, then `npx drizzle-kit push`
+- To add auth plugins (e.g. OAuth, 2FA), extend `lib/auth.ts` and re-run `npx auth@latest generate`
 - Never call BetterAuth REST endpoints directly from server code — use the `auth` instance methods
 
 ---
