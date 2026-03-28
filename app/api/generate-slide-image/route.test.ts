@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { mockGenerateImage, mockGetSession, mockHeaders } = vi.hoisted(() => ({
   mockGenerateImage: vi.fn(),
@@ -15,6 +15,11 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('next/headers', () => ({ headers: mockHeaders }))
 
 import { POST } from './route'
+
+beforeEach(() => {
+  mockGetSession.mockResolvedValue(authedSession)
+  mockHeaders.mockResolvedValue(new Headers())
+})
 
 const authedSession = { user: { id: 'user-1' } }
 const fakeImage = { base64: 'abc123', mediaType: 'image/png', uint8Array: new Uint8Array() }

@@ -29,12 +29,14 @@ export async function POST(req: Request) {
     return Response.json({ error: 'imagePrompt is required' }, { status: 400 })
   }
 
-  if (typeof slideIndex !== 'number' || !Number.isInteger(slideIndex)) {
+  if (typeof slideIndex !== 'number' || !Number.isInteger(slideIndex) || slideIndex < 0) {
     return Response.json({ error: 'slideIndex is required' }, { status: 400 })
   }
 
+  const trimmedPrompt = imagePrompt.trim()
+
   try {
-    const { images } = await generateImage(imagePrompt.trim(), { size: '1920*1080' })
+    const { images } = await generateImage(trimmedPrompt, { size: '1920*1080' })
     const image = images[0]
 
     if (!image) {
