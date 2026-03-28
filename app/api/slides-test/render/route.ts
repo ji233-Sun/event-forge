@@ -18,7 +18,10 @@ export async function POST(request: Request) {
   }
 
   try {
-    const marp = new Marp({ html: true });
+    // html: false (default) — disables raw HTML passthrough in markdown.
+    // If raw HTML support is ever required, sanitize output with DOMPurify
+    // before sending to the client to prevent XSS injection.
+    const marp = new Marp({ html: false });
     const { html, css } = marp.render(body.markdown);
     return Response.json({ html, css });
   } catch (error) {

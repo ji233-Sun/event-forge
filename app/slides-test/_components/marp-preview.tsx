@@ -379,6 +379,14 @@ function MarpPreviewImpl({ values }: { values: TemplateValues }) {
       <div className="mt-2 flex-1 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-200/70 p-3">
         {state.css && state.html ? (
           <>
+            {/*
+              Trust boundary: state.html and state.css come exclusively from the
+              server-side /api/slides-test/render endpoint (authenticated, same-user
+              session). Marp renders with html: false so raw HTML tags in markdown
+              are escaped rather than passed through, preventing script injection.
+              If html: true is ever re-enabled, sanitize state.html with DOMPurify
+              before assigning it here, or isolate this in a sandboxed iframe.
+            */}
             <style dangerouslySetInnerHTML={{ __html: `${state.css}\n${CANVAS_CSS}` }} />
             <div
               ref={previewRootRef}
