@@ -52,7 +52,7 @@ export default function LoginPage() {
       return
     }
 
-    // 邮箱未验证 → 自动发 OTP 跳转验证步骤
+    // Email not verified → auto-send OTP and redirect to verify step
     if (error.code === 'EMAIL_NOT_VERIFIED') {
       const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
         email,
@@ -60,17 +60,17 @@ export default function LoginPage() {
       })
       setLoading(false)
       if (otpError) {
-        setError(otpError.message ?? '验证码发送失败，请稍后重试')
+        setError(otpError.message ?? 'Failed to send verification code, please try again later')
         return
       }
       startCooldown()
-      setInfo('验证码已发送，请查收邮件')
+      setInfo('Verification code sent, please check your email')
       setStep('verify')
       return
     }
 
     setLoading(false)
-    setError(error.message ?? '登录失败，请检查邮箱和密码')
+    setError(error.message ?? 'Login failed, please check your email and password')
   }
 
   async function handleVerify(e: React.FormEvent) {
@@ -86,12 +86,12 @@ export default function LoginPage() {
       return
     }
 
-    // 邮箱已验证，重新登录建立会话
+    // Email verified, sign in to establish session
     const { error: signInError } = await authClient.signIn.email({ email, password })
     setLoading(false)
 
     if (signInError) {
-      setError(signInError.message ?? '登录失败，请重试')
+      setError(signInError.message ?? 'Login failed, please try again')
       return
     }
 
@@ -112,20 +112,20 @@ export default function LoginPage() {
     setLoading(false)
 
     if (otpError) {
-      setError(otpError.message ?? '发送失败，请稍后重试')
+      setError(otpError.message ?? 'Failed to send, please try again later')
       return
     }
 
     startCooldown()
-    setInfo('验证码已重新发送')
+    setInfo('Verification code resent')
   }
 
   if (step === 'verify') {
     return (
       <Card className="w-full max-w-[400px] border-border/50 shadow-xl shadow-primary/5 transition-all">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold tracking-tight">验证邮箱</CardTitle>
-          <CardDescription>验证码已发送至 {email}</CardDescription>
+          <CardTitle className="text-2xl font-bold tracking-tight">Verify Email</CardTitle>
+          <CardDescription>Verification code sent to {email}</CardDescription>
         </CardHeader>
 
         <form onSubmit={handleVerify}>
@@ -134,12 +134,12 @@ export default function LoginPage() {
             {info && !error && <InfoAlert message={info} />}
 
             <div className="space-y-2">
-              <Label htmlFor="otp" className="text-sm font-medium">验证码</Label>
+              <Label htmlFor="otp" className="text-sm font-medium">Verification Code</Label>
               <Input
                 id="otp"
                 type="text"
                 inputMode="numeric"
-                placeholder="请输入 6 位数字验证码"
+                placeholder="Enter 6-digit code"
                 maxLength={6}
                 required
                 autoFocus
@@ -157,8 +157,8 @@ export default function LoginPage() {
               disabled={loading}
             >
               {loading
-                ? <><IconLoader2 size={18} className="animate-spin mr-2" />验证中...</>
-                : '验证并登录'}
+                ? <><IconLoader2 size={18} className="animate-spin mr-2" />Verifying...</>
+                : 'Verify & Sign In'}
             </Button>
             <button
               type="button"
@@ -166,7 +166,7 @@ export default function LoginPage() {
               disabled={!canResend || loading}
               onClick={handleResend}
             >
-              {canResend ? '没收到邮件？重新发送' : `重新发送（${cooldown}s）`}
+              {canResend ? "Didn't receive the email? Resend" : `Resend (${cooldown}s)`}
             </button>
           </CardFooter>
         </form>
@@ -177,8 +177,8 @@ export default function LoginPage() {
   return (
     <Card className="w-full max-w-[400px] border-border/50 shadow-xl shadow-primary/5 transition-all">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold tracking-tight">欢迎回来</CardTitle>
-        <CardDescription>请登录你的账户以访问 EventForge</CardDescription>
+        <CardTitle className="text-2xl font-bold tracking-tight">Welcome Back</CardTitle>
+        <CardDescription>Sign in to your account to access EventForge</CardDescription>
       </CardHeader>
 
       <form onSubmit={handleLogin}>
@@ -186,7 +186,7 @@ export default function LoginPage() {
           {error && <ErrorAlert message={error} />}
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">邮箱地址</Label>
+            <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
             <Input
               id="email"
               type="email"
@@ -200,12 +200,12 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">密码</Label>
+            <Label htmlFor="password">Password</Label>
             <div className="relative group">
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
-                placeholder="输入你的密码"
+                placeholder="Enter your password"
                 autoComplete="current-password"
                 required
                 className="h-11 pr-11 transition-all focus-visible:ring-primary/20"
@@ -214,7 +214,7 @@ export default function LoginPage() {
               />
               <button
                 type="button"
-                aria-label={showPassword ? '隐藏密码' : '显示密码'}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground group-focus-within:text-foreground"
               >
@@ -231,13 +231,13 @@ export default function LoginPage() {
             disabled={loading}
           >
             {loading
-              ? <><IconLoader2 size={18} className="animate-spin mr-2" />正在登录...</>
-              : '登录'}
+              ? <><IconLoader2 size={18} className="animate-spin mr-2" />Signing in...</>
+              : 'Sign In'}
           </Button>
           <p className="text-sm text-muted-foreground text-center">
-            还没有账户？{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/register" className="font-semibold text-primary underline-offset-4 hover:underline">
-              立即免费注册
+              Sign up for free
             </Link>
           </p>
         </CardFooter>

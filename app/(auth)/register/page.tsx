@@ -42,9 +42,9 @@ export default function RegisterPage() {
   const { cooldown, canResend, startCooldown } = useOtpCooldown()
 
   /**
-   * 第一步：创建账号 + 发送验证码
-   * BetterAuth emailOTP 的 email-verification 类型要求用户已存在，
-   * 所以必须先 signUp，再 sendVerificationOtp。
+   * Step 1: Create account + send verification code
+   * BetterAuth emailOTP email-verification type requires the user to exist first,
+   * so we must signUp before sendVerificationOtp.
    */
   async function handleRegisterAndSendOtp(e: React.FormEvent) {
     e.preventDefault()
@@ -52,17 +52,17 @@ export default function RegisterPage() {
     setInfo('')
 
     if (password !== confirm) {
-      setError('两次密码不一致')
+      setError('Passwords do not match')
       return
     }
     if (password.length < 8) {
-      setError('密码长度至少 8 位')
+      setError('Password must be at least 8 characters')
       return
     }
 
     setLoading(true)
 
-    // 1. 创建账号（emailVerified 初始为 false）
+    // 1. Create account (emailVerified starts as false)
     const { error: signUpError } = await authClient.signUp.email({
       email,
       password,
@@ -71,11 +71,11 @@ export default function RegisterPage() {
 
     if (signUpError) {
       setLoading(false)
-      setError(signUpError.message ?? '注册失败，该邮箱可能已被注册')
+      setError(signUpError.message ?? 'Registration failed, this email may already be registered')
       return
     }
 
-    // 2. 用户已存在，发送验证码
+    // 2. User exists, send verification code
     const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
       email,
       type: 'email-verification',
@@ -84,16 +84,16 @@ export default function RegisterPage() {
     setLoading(false)
 
     if (otpError) {
-      setError(otpError.message ?? '验证码发送失败，请稍后重试')
+      setError(otpError.message ?? 'Failed to send verification code, please try again later')
       return
     }
 
     startCooldown()
-    setInfo('验证码已发送，请查收邮件')
+    setInfo('Verification code sent, please check your email')
     setStep('verify')
   }
 
-  /** 第二步：验证 OTP，标记 emailVerified: true */
+  /** Step 2: Verify OTP, mark emailVerified: true */
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -115,7 +115,7 @@ export default function RegisterPage() {
     router.refresh()
   }
 
-  /** 重新发送验证码 */
+  /** Resend verification code */
   async function handleResend() {
     setError('')
     setInfo('')
@@ -129,22 +129,22 @@ export default function RegisterPage() {
     setLoading(false)
 
     if (otpError) {
-      setError(otpError.message ?? '发送失败，请稍后重试')
+      setError(otpError.message ?? 'Failed to send, please try again later')
       return
     }
 
     startCooldown()
-    setInfo('验证码已重新发送')
+    setInfo('Verification code resent')
   }
 
   return (
     <Card className="w-full max-w-[400px] border-border/50 shadow-xl shadow-primary/5 transition-all">
       <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl font-bold tracking-tight">创建账户</CardTitle>
+        <CardTitle className="text-2xl font-bold tracking-tight">Create Account</CardTitle>
         <CardDescription>
           {step === 'form'
-            ? '只需几秒钟，开启你的 EventForge 旅程'
-            : `验证码已发送至 ${email}`}
+            ? 'Get started with EventForge in seconds'
+            : `Verification code sent to ${email}`}
         </CardDescription>
       </CardHeader>
 
@@ -154,7 +154,7 @@ export default function RegisterPage() {
             {error && <ErrorAlert message={error} />}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">邮箱地址</Label>
+              <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
               <Input
                 id="email"
                 type="email"
@@ -168,12 +168,12 @@ export default function RegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">设置密码</Label>
+              <Label htmlFor="password">Password</Label>
               <div className="relative group">
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="至少 8 位字符"
+                  placeholder="At least 8 characters"
                   autoComplete="new-password"
                   required
                   className="h-11 pr-11 transition-all focus-visible:ring-primary/20"
@@ -185,12 +185,12 @@ export default function RegisterPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirm">确认密码</Label>
+              <Label htmlFor="confirm">Confirm Password</Label>
               <div className="relative group">
                 <Input
                   id="confirm"
                   type={showConfirm ? 'text' : 'password'}
-                  placeholder="再次输入以确认"
+                  placeholder="Enter again to confirm"
                   autoComplete="new-password"
                   required
                   className="h-11 pr-11 transition-all focus-visible:ring-primary/20"
@@ -209,15 +209,15 @@ export default function RegisterPage() {
               disabled={loading}
             >
               {loading ? (
-                <><IconLoader2 size={18} className="animate-spin mr-2" />处理中...</>
+                <><IconLoader2 size={18} className="animate-spin mr-2" />Processing...</>
               ) : (
-                '注册并获取验证码'
+                'Sign Up & Get Code'
               )}
             </Button>
             <p className="text-sm text-muted-foreground text-center">
-              已有账户？{' '}
+              Already have an account?{' '}
               <Link href="/login" className="font-semibold text-primary underline-offset-4 hover:underline">
-                立即登录
+                Sign In
               </Link>
             </p>
           </CardFooter>
@@ -229,12 +229,12 @@ export default function RegisterPage() {
             {info && !error && <InfoAlert message={info} />}
 
             <div className="space-y-2">
-              <Label htmlFor="otp" className="text-sm font-medium">验证码</Label>
+              <Label htmlFor="otp" className="text-sm font-medium">Verification Code</Label>
               <Input
                 id="otp"
                 type="text"
                 inputMode="numeric"
-                placeholder="请输入 6 位数字验证码"
+                placeholder="Enter 6-digit code"
                 maxLength={6}
                 required
                 autoFocus
@@ -252,9 +252,9 @@ export default function RegisterPage() {
               disabled={loading}
             >
               {loading ? (
-                <><IconLoader2 size={18} className="animate-spin mr-2" />验证中...</>
+                <><IconLoader2 size={18} className="animate-spin mr-2" />Verifying...</>
               ) : (
-                '验证并完成注册'
+                'Verify & Complete Registration'
               )}
             </Button>
             <button
@@ -263,7 +263,7 @@ export default function RegisterPage() {
               disabled={!canResend || loading}
               onClick={handleResend}
             >
-              {canResend ? '没收到邮件？重新发送' : `重新发送（${cooldown}s）`}
+              {canResend ? "Didn't receive the email? Resend" : `Resend (${cooldown}s)`}
             </button>
           </CardFooter>
         </form>
@@ -297,7 +297,7 @@ function PasswordToggle({ show, onToggle }: { show: boolean; onToggle: () => voi
   return (
     <button
       type="button"
-      aria-label={show ? '隐藏密码' : '显示密码'}
+      aria-label={show ? 'Hide password' : 'Show password'}
       onClick={onToggle}
       className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground group-focus-within:text-foreground"
     >

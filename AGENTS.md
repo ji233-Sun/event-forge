@@ -61,6 +61,12 @@ lib/db/auth-schema.ts           # DB tables (user, session, account, verificatio
 
 ---
 
+# UI Language
+
+**Rule:** All UI text must be written in English — labels, placeholders, button text, error messages, descriptions, aria-labels, and any other user-visible strings. Do not use Chinese or any other language in UI copy.
+
+---
+
 # shadcn/ui
 
 **Docs:** https://ui.shadcn.com/docs (use context7 MCP for offline lookup)
