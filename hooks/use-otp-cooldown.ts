@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react'
 const COOLDOWN_SECONDS = 60
 
 const OTP_ERROR_MESSAGES: Record<string, string> = {
-  INVALID_OTP: '验证码不正确，请重新输入',
-  OTP_EXPIRED: '验证码已过期，请重新发送',
-  TOO_MANY_ATTEMPTS: '错误次数过多，请重新获取验证码',
+  INVALID_OTP: 'Incorrect code, please try again',
+  OTP_EXPIRED: 'Code has expired, please request a new one',
+  TOO_MANY_ATTEMPTS: 'Too many attempts, please request a new code',
 }
 
-export function getOtpErrorMessage(code?: string | null, fallback = '验证失败，请稍后重试') {
+export function getOtpErrorMessage(code?: string | null, fallback = 'Verification failed, please try again later') {
   return (code && OTP_ERROR_MESSAGES[code]) ?? fallback
 }
 
