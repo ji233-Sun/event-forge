@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { authClient } from '@/lib/auth-client'
+import { useOtpCooldown } from '@/hooks/use-otp-cooldown'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -38,6 +39,7 @@ export default function RegisterPage() {
   const [info, setInfo] = useState('')
   const [step, setStep] = useState<Step>('form')
   const [loading, setLoading] = useState(false)
+  const { cooldown, canResend, startCooldown } = useOtpCooldown()
 
   /**
    * 第一步：创建账号 + 发送验证码
@@ -86,6 +88,7 @@ export default function RegisterPage() {
       return
     }
 
+    startCooldown()
     setInfo('验证码已发送，请查收邮件')
     setStep('verify')
   }
@@ -130,6 +133,7 @@ export default function RegisterPage() {
       return
     }
 
+    startCooldown()
     setInfo('验证码已重新发送')
   }
 
@@ -255,11 +259,11 @@ export default function RegisterPage() {
             </Button>
             <button
               type="button"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-              disabled={loading}
+              className="text-sm text-muted-foreground hover:text-foreground disabled:opacity-40 transition-colors"
+              disabled={!canResend || loading}
               onClick={handleResend}
             >
-              没收到邮件？重新发送
+              {canResend ? '没收到邮件？重新发送' : `重新发送（${cooldown}s）`}
             </button>
           </CardFooter>
         </form>
