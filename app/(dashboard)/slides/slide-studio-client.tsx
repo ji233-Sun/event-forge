@@ -87,10 +87,10 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
 
       const title = getSlideTitle(parseSlides(data.markdown)[0], 'Untitled Deck')
-      const saved = await saveDeck({ title, prompt: prompt.trim(), markdown: data.markdown })
+      const saved = await saveDeck({ title, prompt: prompt.trim(), mode: 'marp', markdown: data.markdown })
 
       setDeckId(saved.id)
-      setDecks((prev) => [{ id: saved.id, title, prompt: prompt.trim(), createdAt: new Date() }, ...prev])
+      setDecks((prev) => [{ id: saved.id, title, prompt: prompt.trim(), mode: 'marp', createdAt: new Date() }, ...prev])
       setSession({ html: data.html, css: data.css, markdown: data.markdown })
       setCurrentSlideIndex(0)
       setPhase('studio')
@@ -152,6 +152,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     try {
       const { getDeck } = await import('./actions')
       const d = await getDeck(id)
+      if (!d.markdown) throw new Error('Deck has no markdown')
       const { html, css } = await renderMarkdown(d.markdown)
       setDeckId(d.id)
       setSession({ html, css, markdown: d.markdown })
