@@ -92,9 +92,8 @@ describe("POST /api/restyle-slides", () => {
     expect(res.status).toBe(200);
     expect(mockRender).toHaveBeenCalledOnce();
     // The rendered markdown should have new style injected
-    const renderedMarkdown = mockRender.mock.calls[0]?.[0] as string;
-    expect(renderedMarkdown).toContain("style: |");
-    expect(renderedMarkdown).not.toContain("[GENERATE HEX]");
+    expect(mockRender).toHaveBeenCalledWith(expect.stringContaining("style: |"));
+    expect(mockRender).not.toHaveBeenCalledWith(expect.stringContaining("[GENERATE HEX]"));
   });
 
   it("returns 502 when Marp render throws", async () => {
