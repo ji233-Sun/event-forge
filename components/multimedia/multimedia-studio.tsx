@@ -127,7 +127,7 @@ export function MultimediaStudio() {
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-muted-foreground md:text-lg">
             This demo implements the multimedia lane from the EventForge design. Describe the
-            event once and the studio will assemble a hero poster, a playable demo soundtrack, and
+            event once and the studio will assemble a hero poster, soundtrack controls for on-demand generation, and
             share-ready launch copy.
           </p>
         </div>
@@ -180,8 +180,8 @@ export function MultimediaStudio() {
               </Button>
 
               <p className="text-sm leading-6 text-muted-foreground">
-                The soundtrack uses a curated demo catalog for hackathon-speed playback while the
-                poster and copy are generated from the event brief.
+                Poster and social copy are generated from the brief first. Music is generated
+                on demand from the result card and stored only in your current session.
               </p>
 
               {error ? (
@@ -220,7 +220,7 @@ export function MultimediaStudio() {
                   <div className="rounded-md border border-primary-foreground/10 bg-primary-foreground/5 p-4">
                     <p className="text-xs uppercase tracking-[0.24em] text-primary-foreground/50">Audio</p>
                     <p className="mt-3 text-sm text-primary-foreground/70">
-                      A playable soundtrack match selected for the campaign mood.
+                      User-triggered instrumental generation with adjustable music controls.
                     </p>
                   </div>
                   <div className="rounded-md border border-primary-foreground/10 bg-primary-foreground/5 p-4">

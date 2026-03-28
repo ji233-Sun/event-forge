@@ -19,9 +19,21 @@ import { MultimediaResult } from '@/components/multimedia/multimedia-result'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import type { MultimediaExperience } from '@/lib/multimedia/types'
+import {
+  DEFAULT_POSTER_ASPECT_RATIO,
+  type MultimediaExperience,
+  type PosterAspectRatio,
+} from '@/lib/multimedia/types'
+import { cn } from '@/lib/utils'
 import { getMediaHistory, type MediaHistoryItem, type MediaHistoryPage } from './actions'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -34,15 +46,24 @@ const EXAMPLE_BRIEFS = [
 
 const LOADING_MESSAGES = [
   { icon: IconPhoto, text: 'Crafting your poster...' },
-  { icon: IconMusic, text: 'Matching a soundtrack...' },
+  { icon: IconMusic, text: 'Preparing soundtrack controls...' },
   { icon: IconMessageCircle, text: 'Writing social copy...' },
   { icon: IconSparkles, text: 'Polishing the final kit...' },
 ]
 
+const POSTER_RATIO_OPTIONS: Array<{ value: PosterAspectRatio; label: string }> = [
+  { value: '16:9', label: '16:9 Landscape' },
+  { value: '4:5', label: '4:5 Portrait' },
+  { value: '1:1', label: '1:1 Square' },
+  { value: '9:16', label: '9:16 Story' },
+]
+
+const UI_LABEL_CLASS = 'text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground'
+
 type Phase = 'input' | 'loading' | 'result'
 
 type MultimediaApiResponse =
-  | { data: MultimediaExperience; id: string }
+  | { data: MultimediaExperience; id: string | null }
   | { error: string }
 
 // ─── Generate Tab ────────────────────────────────────────────────────────────
@@ -50,8 +71,10 @@ type MultimediaApiResponse =
 function GenerateTab() {
   const [phase, setPhase] = useState<Phase>('input')
   const [brief, setBrief] = useState(EXAMPLE_BRIEFS[0])
+  const [posterAspectRatio, setPosterAspectRatio] = useState<PosterAspectRatio>(DEFAULT_POSTER_ASPECT_RATIO)
   const [error, setError] = useState('')
   const [result, setResult] = useState<MultimediaExperience | null>(null)
+  const [resultRecordId, setResultRecordId] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   const [loadingStep, setLoadingStep] = useState(0)
 
@@ -91,6 +114,7 @@ function GenerateTab() {
     setCopied(false)
     setError('')
     setResult(null)
+    setResultRecordId(null)
     setPhase('loading')
     startLoadingAnimation()
 
@@ -100,7 +124,10 @@ function GenerateTab() {
       const response = await fetch('/api/multimedia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brief: normalizedBrief }),
+        body: JSON.stringify({
+          brief: normalizedBrief,
+          aspectRatio: posterAspectRatio,
+        }),
       })
 
       const payload = (await response.json()) as MultimediaApiResponse
@@ -117,11 +144,13 @@ function GenerateTab() {
 
       stopLoadingAnimation()
       setResult(payload.data)
+      setResultRecordId(payload.id ?? null)
       setPhase('result')
     } catch (requestError) {
       if (requestId !== requestIdRef.current) return
       stopLoadingAnimation()
       setResult(null)
+      setResultRecordId(null)
       setError(
         requestError instanceof Error
           ? requestError.message
@@ -146,6 +175,7 @@ function GenerateTab() {
   function handleReset() {
     setPhase('input')
     setResult(null)
+    setResultRecordId(null)
     setError('')
     setCopied(false)
   }
@@ -153,18 +183,15 @@ function GenerateTab() {
   // ─── Input Phase ─────────────────────────────────────────────────────────
   if (phase === 'input') {
     return (
-      <div className="mx-auto max-w-2xl space-y-6">
-        <Card className="border-border/60 bg-card/80 p-6 backdrop-blur-sm">
-          <form className="space-y-5" onSubmit={handleSubmit}>
-            <div className="space-y-2">
-              <Label
-                className="text-xs font-medium uppercase tracking-widest text-muted-foreground"
-                htmlFor="event-brief"
-              >
+      <div className="mx-auto max-w-3xl space-y-7">
+        <Card className="border-border bg-card p-6 sm:p-7">
+          <form className="space-y-6" onSubmit={handleSubmit}>
+            <div className="space-y-3">
+              <Label className={UI_LABEL_CLASS} htmlFor="event-brief">
                 Event Brief
               </Label>
               <Textarea
-                className="min-h-36 resize-none bg-background/70 text-sm leading-relaxed"
+                className="min-h-32 resize-none bg-background text-sm leading-6"
                 id="event-brief"
                 onChange={(e) => setBrief(e.target.value)}
                 placeholder="Describe your event, audience, mood, and the kind of campaign you want to launch."
@@ -172,14 +199,14 @@ function GenerateTab() {
               />
             </div>
 
-            <div className="space-y-2">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            <div className="space-y-3">
+              <p className={UI_LABEL_CLASS}>
                 Quick Starts
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid gap-2 sm:grid-cols-2">
                 {EXAMPLE_BRIEFS.map((exampleBrief) => (
                   <Button
-                    className="h-auto whitespace-normal px-3 py-1.5 text-left text-xs leading-5"
+                    className="h-auto justify-start whitespace-normal px-3 py-2 text-left text-xs leading-5"
                     key={exampleBrief}
                     onClick={() => setBrief(exampleBrief)}
                     size="sm"
@@ -194,9 +221,27 @@ function GenerateTab() {
               </div>
             </div>
 
-            <div className="flex gap-2">
+            <div className="space-y-3">
+              <Label className={UI_LABEL_CLASS}>
+                Poster Ratio
+              </Label>
+              <Select value={posterAspectRatio} onValueChange={(value) => setPosterAspectRatio(value as PosterAspectRatio)}>
+                <SelectTrigger className="h-10 w-full">
+                  <SelectValue placeholder="Select poster ratio" />
+                </SelectTrigger>
+                <SelectContent>
+                  {POSTER_RATIO_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2 pt-1">
               <Button
-                className="flex-1 shadow-lg shadow-primary/20"
+                className="h-10 flex-1"
                 disabled={brief.trim().length === 0}
                 type="submit"
               >
@@ -205,6 +250,7 @@ function GenerateTab() {
                 <IconArrowRight size={16} />
               </Button>
               <Button
+                className="h-10"
                 variant="outline"
                 type="button"
                 onClick={() =>
@@ -255,14 +301,21 @@ function GenerateTab() {
   // ─── Result Phase ────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Generated Media Kit</h2>
         <Button variant="outline" size="sm" onClick={handleReset}>
           <IconSparkles size={14} />
           Generate Another
         </Button>
       </div>
-      {result && <MultimediaResult copied={copied} onCopy={handleCopy} result={result} />}
+      {result && (
+        <MultimediaResult
+          copied={copied}
+          onCopy={handleCopy}
+          parentRecordId={resultRecordId}
+          result={result}
+        />
+      )}
     </div>
   )
 }
@@ -332,7 +385,7 @@ function HistoryTab({ initialData }: { initialData: MediaHistoryPage }) {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {loading && (
         <div className="flex justify-center py-8">
           <IconLoader2 size={24} className="animate-spin text-muted-foreground" />
@@ -400,19 +453,19 @@ function HistoryCard({
   onCopy: () => void
 }) {
   return (
-    <Card className="overflow-hidden border-border/60 bg-card/80 backdrop-blur-sm">
+    <Card className="overflow-hidden border-border bg-card">
       <button
         type="button"
-        className="flex w-full items-center gap-4 px-5 py-4 text-left transition-colors hover:bg-muted/30"
+        className="flex w-full items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-muted/20 sm:px-5"
         onClick={onToggle}
       >
         {/* Poster thumbnail */}
-        <div className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border/70 bg-muted">
           <Image
             src={item.result.poster.imageDataUrl}
             alt={item.result.poster.alt}
-            width={56}
-            height={56}
+            width={64}
+            height={64}
             className="h-full w-full object-cover"
             unoptimized
           />
@@ -420,17 +473,26 @@ function HistoryCard({
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{item.result.concept.title}</p>
-          <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">{item.brief}</p>
+          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.brief}</p>
         </div>
 
-        <span className="shrink-0 text-xs text-muted-foreground">
-          {dateFormatter.format(new Date(item.createdAt))}
-        </span>
+        <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+          <span className="hidden sm:inline">{dateFormatter.format(new Date(item.createdAt))}</span>
+          <IconChevronRight size={14} className={cn('transition-transform', isExpanded && 'rotate-90')} />
+        </div>
       </button>
 
       {isExpanded && (
-        <div className="border-t border-border/60 p-5">
-          <MultimediaResult copied={copied} onCopy={onCopy} result={item.result} />
+        <div className="border-t border-border/70 p-4 sm:p-5">
+          <MultimediaResult
+            copied={copied}
+            initialPosterVariants={item.variants}
+            onCopy={onCopy}
+            parentRecordId={item.id}
+            result={item.result}
+            showMusicGenerator={false}
+            showPosterWorkspace={false}
+          />
         </div>
       )}
     </Card>

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_POSTER_ASPECT_RATIO } from '../types'
 
 vi.mock('server-only', () => ({}))
 
@@ -12,10 +13,6 @@ vi.mock('@/lib/ai', () => ({
   generateImage: mockGenerateImage,
 }))
 
-import {
-  DEFAULT_SOUNDTRACK_ID,
-  SOUNDTRACKS,
-} from '../audio-catalog'
 import { generateMultimediaExperience } from '../generator'
 
 describe('generateMultimediaExperience', () => {
@@ -30,7 +27,6 @@ describe('generateMultimediaExperience', () => {
         visualDirection: 'Chrome light beams over a campus lawn at dusk',
         posterPrompt:
           'Cyberpunk campus music festival poster, holographic stage, chrome haze, electric pink and acid green',
-        soundtrackId: SOUNDTRACKS[1].id,
         caption:
           '⚡ Campus after dark. Neon grass, live bands, and a crowd ready to glow. Save your Friday night for the loudest lawn in town.',
         cta: 'RSVP before the gates open',
@@ -61,8 +57,8 @@ describe('generateMultimediaExperience', () => {
         imageDataUrl: 'data:image/png;base64,poster-base64',
         prompt:
           'Cyberpunk campus music festival poster, holographic stage, chrome haze, electric pink and acid green',
+        aspectRatio: DEFAULT_POSTER_ASPECT_RATIO,
       },
-      soundtrack: SOUNDTRACKS[1],
       socialCopy: {
         caption:
           '⚡ Campus after dark. Neon grass, live bands, and a crowd ready to glow. Save your Friday night for the loudest lawn in town.',
@@ -74,16 +70,14 @@ describe('generateMultimediaExperience', () => {
     })
   })
 
-  it('falls back to the default soundtrack when the model returns an unknown key', async () => {
+  it('falls back to default hashtags when the model output is missing them', async () => {
     mockGenerate.mockResolvedValue({
       text: JSON.stringify({
         title: 'After Hours Parade',
         visualDirection: 'Laser grids over a city skyline',
         posterPrompt: 'Retro-futurist skyline concert poster',
-        soundtrackId: 'unknown-track',
         caption: '🌃 Night shift energy meets a live crowd.',
         cta: 'Bring your crew',
-        hashtags: ['#FutureNight'],
       }),
     })
     mockGenerateImage.mockResolvedValue({
@@ -99,7 +93,39 @@ describe('generateMultimediaExperience', () => {
       'Create a midnight launch party with synth-wave energy.',
     )
 
-    expect(result.soundtrack.id).toBe(DEFAULT_SOUNDTRACK_ID)
+    expect(result.socialCopy.hashtags).toEqual(['#EventForge', '#LiveEvent'])
     expect(result.poster.imageDataUrl).toBe('data:image/webp;base64,fallback-base64')
+  })
+
+  it('uses ratio-specific image size when a portrait ratio is requested', async () => {
+    mockGenerate.mockResolvedValue({
+      text: JSON.stringify({
+        title: 'Vertical Launch Poster',
+        visualDirection: 'Tall composition with clear typography hierarchy',
+        posterPrompt: 'Vertical event poster with title area, subtitle, and footer details',
+        caption: '🎯 Story-first launch creatives for social reach.',
+        cta: 'Claim your early-access pass',
+        hashtags: ['#EventForge'],
+      }),
+    })
+    mockGenerateImage.mockResolvedValue({
+      images: [
+        {
+          base64: 'portrait-base64',
+          mediaType: 'image/png',
+        },
+      ],
+    })
+
+    const result = await generateMultimediaExperience(
+      'Build a launch poster optimized for vertical social formats.',
+      { aspectRatio: '9:16' },
+    )
+
+    expect(result.poster.aspectRatio).toBe('9:16')
+    expect(mockGenerateImage).toHaveBeenCalledWith(
+      'Vertical event poster with title area, subtitle, and footer details',
+      expect.objectContaining({ size: '864x1536' }),
+    )
   })
 })

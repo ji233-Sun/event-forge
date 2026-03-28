@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_POSTER_ASPECT_RATIO } from '@/lib/multimedia/types'
 
 const { mockGenerateMultimediaExperience, mockGetSession } = vi.hoisted(() => ({
   mockGenerateMultimediaExperience: vi.fn(),
@@ -71,13 +72,6 @@ describe('POST /api/multimedia', () => {
         imageDataUrl: 'data:image/png;base64,abc',
         prompt: 'Poster prompt',
       },
-      soundtrack: {
-        id: 'neon-pulse',
-        title: 'Neon Pulse',
-        description: 'Synthetic energy',
-        previewUrl: 'https://example.com/audio.mp3',
-        durationLabel: 'Demo loop',
-      },
       socialCopy: {
         caption: '⚡ Skyline beats all night.',
         cta: 'Join the drop',
@@ -99,11 +93,10 @@ describe('POST /api/multimedia', () => {
         concept: {
           title: 'Rooftop Frequency',
         },
-        soundtrack: {
-          id: 'neon-pulse',
-        },
       },
     })
-    expect(mockGenerateMultimediaExperience).toHaveBeenCalledWith('Launch a rooftop DJ night.')
+    expect(mockGenerateMultimediaExperience).toHaveBeenCalledWith('Launch a rooftop DJ night.', {
+      aspectRatio: DEFAULT_POSTER_ASPECT_RATIO,
+    })
   })
 })

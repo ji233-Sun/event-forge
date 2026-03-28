@@ -1,13 +1,21 @@
 import 'server-only'
 
 import { generate, generateImage } from '@/lib/ai'
-import { getSoundtrackById, SOUNDTRACKS } from './audio-catalog'
 import type {
+  PosterAspectRatio,
   MultimediaExperience,
   MultimediaModelPayload,
 } from './types'
+import { DEFAULT_POSTER_ASPECT_RATIO } from './types'
 
 const DEFAULT_HASHTAGS = ['#EventForge', '#LiveEvent']
+
+const POSTER_IMAGE_SIZE_BY_RATIO: Record<PosterAspectRatio, string> = {
+  '16:9': '1536x864',
+  '4:5': '1024x1280',
+  '1:1': '1280x1280',
+  '9:16': '864x1536',
+}
 
 function unwrapJson(raw: string) {
   const trimmed = raw.trim()
@@ -53,9 +61,6 @@ function parseModelPayload(raw: string): MultimediaModelPayload {
     title: parsed.title.trim(),
     visualDirection: parsed.visualDirection.trim(),
     posterPrompt: parsed.posterPrompt.trim(),
-    soundtrackId: isNonEmptyString(parsed.soundtrackId)
-      ? parsed.soundtrackId.trim()
-      : SOUNDTRACKS[0].id,
     caption: parsed.caption.trim(),
     cta: parsed.cta.trim(),
     hashtags: normalizeHashtags(parsed.hashtags),
@@ -70,37 +75,33 @@ function toDataUrl(image: { base64: string; mediaType?: string }) {
   return `data:${image.mediaType ?? 'image/png'};base64,${image.base64}`
 }
 
-function buildSystemPrompt() {
-  const soundtrackOptions = SOUNDTRACKS.map((track) => `${track.id}: ${track.description}`).join(
-    '\n',
-  )
+export function resolvePosterAspectRatio(aspectRatio?: PosterAspectRatio): PosterAspectRatio {
+  return aspectRatio ?? DEFAULT_POSTER_ASPECT_RATIO
+}
 
+function buildSystemPrompt(aspectRatio: PosterAspectRatio) {
   return [
     'You are the multimedia orchestrator for EventForge.',
     'Return strict JSON only. Do not wrap the response in markdown.',
     'All copy must be in English.',
-    'Choose exactly one soundtrackId from this list:',
-    soundtrackOptions,
+    `Target poster aspect ratio: ${aspectRatio}.`,
+    'Poster prompt must describe a real event poster composition, not a plain background image.',
+    'Poster prompt should explicitly include: strong focal artwork, clear title zone, subtitle/date/venue info zone, and readable text-safe spacing.',
     'Return this shape:',
-    '{"title":"","visualDirection":"","posterPrompt":"","soundtrackId":"","caption":"","cta":"","hashtags":["#EventForge"]}',
+    '{"title":"","visualDirection":"","posterPrompt":"","caption":"","cta":"","hashtags":["#EventForge"]}',
     'Caption should be 2-4 energetic sentences with emoji.',
     'Poster prompt should be detailed enough for an image model.',
   ].join('\n')
 }
 
-export async function generateMultimediaExperience(
-  brief: string,
-): Promise<MultimediaExperience> {
-  const normalizedBrief = brief.trim()
-
-  const metadataResult = await generate('hard', normalizedBrief, {
-    system: buildSystemPrompt(),
-  })
-  const metadata = parseModelPayload(metadataResult.text)
-
-  const posterResult = await generateImage(metadata.posterPrompt, {
+export async function generatePosterAsset(
+  prompt: string,
+  aspectRatio: PosterAspectRatio,
+) {
+  const normalizedRatio = resolvePosterAspectRatio(aspectRatio)
+  const posterResult = await generateImage(prompt, {
     n: 1,
-    size: '1536x1024',
+    size: POSTER_IMAGE_SIZE_BY_RATIO[normalizedRatio],
   })
   const poster = posterResult.images[0]
 
@@ -108,7 +109,25 @@ export async function generateMultimediaExperience(
     throw new Error('The image model did not return a poster')
   }
 
-  const soundtrack = getSoundtrackById(metadata.soundtrackId)
+  return {
+    imageDataUrl: toDataUrl(poster),
+    prompt,
+    aspectRatio: normalizedRatio,
+  }
+}
+
+export async function generateMultimediaExperience(
+  brief: string,
+  options: { aspectRatio?: PosterAspectRatio } = {},
+): Promise<MultimediaExperience> {
+  const normalizedBrief = brief.trim()
+  const aspectRatio = resolvePosterAspectRatio(options.aspectRatio)
+
+  const metadataResult = await generate('hard', normalizedBrief, {
+    system: buildSystemPrompt(aspectRatio),
+  })
+  const metadata = parseModelPayload(metadataResult.text)
+  const poster = await generatePosterAsset(metadata.posterPrompt, aspectRatio)
 
   return {
     brief: normalizedBrief,
@@ -118,10 +137,10 @@ export async function generateMultimediaExperience(
     },
     poster: {
       alt: `${metadata.title} poster`,
-      imageDataUrl: toDataUrl(poster),
-      prompt: metadata.posterPrompt,
+      imageDataUrl: poster.imageDataUrl,
+      prompt: poster.prompt,
+      aspectRatio: poster.aspectRatio,
     },
-    soundtrack,
     socialCopy: {
       caption: metadata.caption,
       cta: metadata.cta,
