@@ -42,6 +42,28 @@ describe('parseSlides', () => {
     const slides = parseSlides('# A\n\n---\n\n# B')
     expect(slides).toHaveLength(2)
   })
+
+  it('handles CRLF front-matter and slide separators', () => {
+    const slides = parseSlides(
+      [
+        '---',
+        'marp: true',
+        'theme: default',
+        '---',
+        '',
+        '# Title Slide',
+        '',
+        '---',
+        '',
+        '## Agenda',
+      ].join('\r\n')
+    )
+
+    expect(slides).toHaveLength(2)
+    expect(slides[0]).toContain('marp: true')
+    expect(slides[0]).toContain('# Title Slide')
+    expect(slides[1]).toContain('## Agenda')
+  })
 })
 
 describe('joinSlides', () => {

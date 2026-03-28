@@ -23,7 +23,12 @@ ECharts：保持 data-option 为合法 JSON，backgroundColor 为 "transparent"�
 输出纯 Markdown，不要用代码块包裹，不要任何说明文字。`;
 
 export async function POST(req: Request) {
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const { markdown, instruction, scope, currentSlideIndex } = body as {
     markdown?: string;
     instruction?: string;
@@ -68,7 +73,9 @@ export async function POST(req: Request) {
     let slideContent = segments[idx];
     let frontMatterPrefix = "";
     if (idx === 0) {
-      const fmMatch = slideContent.match(/^(---\s*\n[\s\S]*?\n---\s*\n)/);
+      const fmMatch = slideContent.match(
+        /^(---\s*\r?\n[\s\S]*?\r?\n---\s*(?:\r?\n|$))/
+      );
       if (fmMatch) {
         frontMatterPrefix = fmMatch[1];
         slideContent = slideContent.slice(frontMatterPrefix.length).trim();

@@ -28,14 +28,14 @@ export function ThumbnailStrip({
             "w-full text-left rounded-md border px-3 py-2 text-xs transition-colors",
             "focus:outline-none focus:ring-2 focus:ring-ring",
             i === activeIndex
-              ? "border-cyan-400/70 bg-cyan-400/10 text-cyan-300"
+              ? "border-primary/60 bg-primary/10 text-primary"
               : "border-border bg-muted/30 text-muted-foreground hover:border-border/80 hover:bg-muted/50",
           ].join(" ")}
         >
           <div className="font-medium text-[10px] opacity-60 mb-0.5">
             {i + 1}
           </div>
-          <div className="truncate">{titles[i]}</div>
+          <div className="truncate">{titles[i] ?? `Slide ${i + 1}`}</div>
         </button>
       ))}
     </div>

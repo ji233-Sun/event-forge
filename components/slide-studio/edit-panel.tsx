@@ -17,6 +17,25 @@ interface EditPanelProps {
   error: string | null;
 }
 
+export const EDIT_PANEL_SUBMIT_HINT = "Ctrl/⌘ + Enter to submit";
+
+type EditInstructionKeyEvent = Pick<
+  React.KeyboardEvent<HTMLTextAreaElement>,
+  "key" | "ctrlKey" | "metaKey" | "preventDefault"
+>;
+
+export async function handleEditInstructionKeyDown(
+  event: EditInstructionKeyEvent,
+  submit: () => void | Promise<void>
+) {
+  if (event.key !== "Enter" || (!event.metaKey && !event.ctrlKey)) {
+    return;
+  }
+
+  event.preventDefault();
+  await submit();
+}
+
 export function EditPanel({
   currentSlideNumber,
   onEdit,
@@ -72,7 +91,7 @@ export function EditPanel({
         onChange={(e) => setInstruction(e.target.value)}
         disabled={isLoading}
         onKeyDown={(e) => {
-          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit();
+          void handleEditInstructionKeyDown(e, handleSubmit);
         }}
       />
 
@@ -103,7 +122,7 @@ export function EditPanel({
       </Button>
 
       <p className="text-xs text-muted-foreground text-center">
-        ⌘ + Enter to submit
+        {EDIT_PANEL_SUBMIT_HINT}
       </p>
     </div>
   );

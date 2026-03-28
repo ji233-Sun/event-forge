@@ -1,19 +1,19 @@
 /**
  * Split a full Marp markdown document into per-slide segments.
  * Segment 0 includes the YAML front-matter (if present).
- * Segments are split on `\n---\n` separators.
+ * Segments are split on LF or CRLF `---` separators.
  */
 export function parseSlides(markdown: string): string[] {
-  const fmMatch = markdown.match(/^(---\s*\n[\s\S]*?\n---\s*\n)/)
+  const fmMatch = markdown.match(/^(---\s*\r?\n[\s\S]*?\r?\n---\s*(?:\r?\n|$))/)
   if (!fmMatch) {
     return markdown
-      .split(/\n---\n/)
+      .split(/\r?\n---\r?\n/)
       .map((s) => s.trim())
       .filter(Boolean)
   }
   const frontMatter = fmMatch[1]
   const rest = markdown.slice(frontMatter.length)
-  const segments = rest.split(/\n---\n/)
+  const segments = rest.split(/\r?\n---\r?\n/)
   segments[0] = frontMatter + segments[0]
   return segments.map((s) => s.trim()).filter(Boolean)
 }

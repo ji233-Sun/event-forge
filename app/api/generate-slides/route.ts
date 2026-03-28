@@ -192,7 +192,12 @@ async function generateMarpMarkdown(
 }
 
 export async function POST(req: Request) {
-  const body = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const { prompt } = body as { prompt?: string };
 
   if (!prompt || typeof prompt !== "string") {
