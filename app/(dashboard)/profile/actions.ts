@@ -23,6 +23,7 @@ export type SurveyStatusBreakdown = {
   draft: number
   published: number
   closed: number
+  other: number
 }
 
 export type ResponseTrendDay = {
@@ -74,30 +75,28 @@ export async function getProfileData(): Promise<ProfileData> {
   const activeSurveys = statusMap.get('published') ?? 0
   const publishedRate = totalSurveys > 0 ? Math.round((activeSurveys / totalSurveys) * 100) : 0
 
-  // --- Response Trend (last 7 days) ---
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
-  sevenDaysAgo.setHours(0, 0, 0, 0)
+  // --- Response Trend (last 7 days, UTC-normalized) ---
+  const now = new Date()
+  const sevenDaysAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6))
 
   const trendRows = await db
     .select({
-      date: sql<string>`${response.createdAt}::date`.as('date'),
+      date: sql<string>`(${response.createdAt} AT TIME ZONE 'UTC')::date`.as('date'),
       count: count(),
     })
     .from(response)
     .innerJoin(survey, eq(response.surveyId, survey.id))
     .where(and(eq(survey.userId, user.id), sql`${response.createdAt} >= ${sevenDaysAgo.toISOString()}::timestamptz`))
-    .groupBy(sql`${response.createdAt}::date`)
-    .orderBy(sql`${response.createdAt}::date`)
+    .groupBy(sql`(${response.createdAt} AT TIME ZONE 'UTC')::date`)
+    .orderBy(sql`(${response.createdAt} AT TIME ZONE 'UTC')::date`)
 
   const trendMap = new Map(trendRows.map((r) => [r.date, r.count]))
   const responseTrend: ResponseTrendDay[] = []
   for (let i = 6; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i))
     const key = d.toISOString().slice(0, 10)
     responseTrend.push({
-      date: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(d),
+      date: new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(d),
       count: trendMap.get(key) ?? 0,
     })
   }
@@ -122,7 +121,12 @@ export async function getProfileData(): Promise<ProfileData> {
 
   return {
     stats: { totalSurveys, totalResponses, activeSurveys, publishedRate },
-    statusBreakdown: { draft: statusMap.get('draft') ?? 0, published: activeSurveys, closed: statusMap.get('closed') ?? 0 },
+    statusBreakdown: {
+      draft: statusMap.get('draft') ?? 0,
+      published: activeSurveys,
+      closed: statusMap.get('closed') ?? 0,
+      other: totalSurveys - (statusMap.get('draft') ?? 0) - activeSurveys - (statusMap.get('closed') ?? 0),
+    },
     responseTrend,
     recentSurveys,
   }

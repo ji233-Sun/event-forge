@@ -78,7 +78,7 @@ export async function getDashboardData() {
     limit: 10,
     with: {
       questions: { columns: { id: true } },
-      responses: { columns: { id: true }, orderBy: (r, { desc }) => [desc(r.createdAt)], limit: 1 },
+      responses: { columns: { id: true } },
     },
   })
 
@@ -92,31 +92,29 @@ export async function getDashboardData() {
     responseCount: s.responses.length,
   }))
 
-  // --- Response Trend (last 7 days) ---
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6)
-  sevenDaysAgo.setHours(0, 0, 0, 0)
+  // --- Response Trend (last 7 days, UTC-normalized) ---
+  const now = new Date()
+  const sevenDaysAgo = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 6))
 
   const trendRows = await db
     .select({
-      date: sql<string>`${response.createdAt}::date`.as('date'),
+      date: sql<string>`(${response.createdAt} AT TIME ZONE 'UTC')::date`.as('date'),
       count: count(),
     })
     .from(response)
     .innerJoin(survey, eq(response.surveyId, survey.id))
     .where(and(eq(survey.userId, user.id), sql`${response.createdAt} >= ${sevenDaysAgo.toISOString()}::timestamptz`))
-    .groupBy(sql`${response.createdAt}::date`)
-    .orderBy(sql`${response.createdAt}::date`)
+    .groupBy(sql`(${response.createdAt} AT TIME ZONE 'UTC')::date`)
+    .orderBy(sql`(${response.createdAt} AT TIME ZONE 'UTC')::date`)
 
   // Fill missing days with 0
   const trendMap = new Map(trendRows.map((r) => [r.date, r.count]))
   const responseTrend: ResponseTrendDay[] = []
   for (let i = 6; i >= 0; i--) {
-    const d = new Date()
-    d.setDate(d.getDate() - i)
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i))
     const key = d.toISOString().slice(0, 10)
     responseTrend.push({
-      date: new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(d),
+      date: new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'UTC' }).format(d),
       count: trendMap.get(key) ?? 0,
     })
   }

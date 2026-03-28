@@ -1,15 +1,15 @@
 const statusConfig: Record<string, { label: string; className: string }> = {
   draft: {
     label: 'Draft',
-    className: 'bg-amber-50 text-amber-800 border-amber-200',
+    className: 'bg-[var(--status-draft-bg)] text-[var(--status-draft-fg)] border-[var(--status-draft-border)]',
   },
   published: {
     label: 'Published',
-    className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    className: 'bg-[var(--status-published-bg)] text-[var(--status-published-fg)] border-[var(--status-published-border)]',
   },
   closed: {
     label: 'Closed',
-    className: 'bg-red-50 text-red-700 border-red-200',
+    className: 'bg-[var(--status-closed-bg)] text-[var(--status-closed-fg)] border-[var(--status-closed-border)]',
   },
 }
 
