@@ -61,7 +61,7 @@ export async function updateDeckMarkdown(deckId: string, markdown: string): Prom
   const user = await requireAuth()
   const [row] = await db.select({ userId: deck.userId }).from(deck).where(eq(deck.id, deckId))
   if (!row || row.userId !== user.id) throw new Error('Deck not found')
-  await db.update(deck).set({ markdown }).where(eq(deck.id, deckId))
+  await db.update(deck).set({ markdown, updatedAt: new Date() }).where(eq(deck.id, deckId))
 }
 
 export async function deleteDeck(deckId: string): Promise<void> {
