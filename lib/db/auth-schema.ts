@@ -218,7 +218,9 @@ export const deck = pgTable(
     id: text("id").primaryKey(),
     title: text("title").notNull(),
     prompt: text("prompt").notNull(),
-    markdown: text("markdown").notNull(),
+    mode: text("mode").notNull().default("marp"),
+    markdown: text("markdown"),
+    images: jsonb("images"),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
