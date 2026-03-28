@@ -61,6 +61,79 @@ lib/db/auth-schema.ts           # DB tables (user, session, account, verificatio
 
 ---
 
+# AI SDK
+
+## Project layout
+
+```
+lib/ai/
+├── provider.ts       # Shared OpenAI-compatible provider (canonical AI interface)
+├── models.ts         # Text model tiers: simple / medium / hard
+├── image.ts          # Shared image model + generateImage helper
+└── index.ts          # Public AI entrypoint for app code
+```
+
+## Rules
+
+- Treat `@/lib/ai` as the canonical AI interface for this repo. AI agents should use it first for any LLM or image generation task.
+- Prefer `generate`, `stream`, `generateImage`, and `getModel` from `@/lib/ai` before reaching for raw SDK primitives.
+- If a feature needs lower-level AI SDK capabilities (tool calling, structured outputs, embeddings, etc.), keep using the shared model instances from `@/lib/ai` and pair them with the `ai` package APIs. Do not create a new provider in feature code.
+- Do NOT import `createOpenAI`, `createOpenAICompatible`, `OpenAI`, or any other vendor SDK in app feature code unless you are explicitly changing the shared provider layer in `lib/ai/`.
+- The shared provider is configured in `lib/ai/provider.ts`. Keep `baseURL`, `apiKey`, headers, vendor switching, and compatibility logic centralized there.
+- Current default tier mapping: `simple` -> `QWEN_MODEL_SIMPLE` / `qwen-turbo`; `medium` -> `QWEN_MODEL_MEDIUM` / `qwen-plus`; `hard` -> `QWEN_MODEL_HARD` / `qwen-max`; image -> `QWEN_MODEL_IMAGE` / `wanx2.6-t2i-turbo`.
+- `lib/ai/provider.ts` and `lib/ai/image.ts` are server-only. Do not import provider code directly into Client Components.
+- When an AI agent needs "the project's AI API", that means the repo-owned interface exported from `@/lib/ai` and backed by the shared provider, not a fresh third-party endpoint created ad hoc.
+
+## Usage
+
+### Text generation
+
+```ts
+import { generate } from '@/lib/ai'
+
+const { text } = await generate(
+  'medium',
+  'Write a sponsor outreach email for a student music festival.',
+)
+```
+
+### Streaming text
+
+```ts
+import { stream } from '@/lib/ai'
+
+const result = stream(
+  'medium',
+  'Draft a launch announcement for an event registration page.',
+)
+```
+
+### Lower-level AI SDK features
+
+```ts
+import { generateText } from 'ai'
+import { getModel } from '@/lib/ai'
+
+const result = await generateText({
+  model: getModel('hard'),
+  system: 'You are an event operations planner.',
+  prompt: 'Break this event request into execution workstreams.',
+})
+```
+
+### Image generation
+
+```ts
+import { generateImage } from '@/lib/ai'
+
+const { images } = await generateImage(
+  'Cyberpunk campus music festival poster, neon lights, cinematic composition',
+  { size: '1024x1024' },
+)
+```
+
+---
+
 # UI Language
 
 **Rule:** All UI text must be written in English — labels, placeholders, button text, error messages, descriptions, aria-labels, and any other user-visible strings. Do not use Chinese or any other language in UI copy.
