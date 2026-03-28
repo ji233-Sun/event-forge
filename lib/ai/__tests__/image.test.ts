@@ -1,84 +1,167 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Hoisted mocks — executed before any import
 vi.mock('server-only', () => ({}))
 
-const { mockQwenProviderImage, mockSdkGenerateImage } = vi.hoisted(() => ({
-  mockQwenProviderImage: vi.fn().mockReturnValue({ modelId: 'mock-image-model' }),
-  mockSdkGenerateImage: vi.fn(),
+const { mockAssertQwenApiKey, mockGetQwenApiKey } = vi.hoisted(() => ({
+  mockAssertQwenApiKey: vi.fn(),
+  mockGetQwenApiKey: vi.fn(() => 'test-api-key'),
 }))
 
 vi.mock('../provider', () => ({
-  qwenProvider: {
-    image: mockQwenProviderImage,
-  },
+  assertQwenApiKey: mockAssertQwenApiKey,
+  getQwenApiKey: mockGetQwenApiKey,
+  qwenApiBaseURL: 'https://dashscope.aliyuncs.com/api/v1',
 }))
 
-vi.mock('ai', () => ({
-  generateImage: mockSdkGenerateImage,
-}))
+const fetchMock = vi.fn<typeof fetch>()
 
-import { generateImage, imageModel } from '../image'
+async function loadImageModule() {
+  vi.resetModules()
+  return import('../image')
+}
 
 describe('lib/ai/image', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock)
+  })
+
   afterEach(() => {
     vi.clearAllMocks()
+    vi.unstubAllGlobals()
+    delete process.env.QWEN_MODEL_IMAGE
   })
 
   describe('imageModel', () => {
-    it('is initialised with the default model id', () => {
-      // QWEN_MODEL_IMAGE not set in test env → falls back to wanx2.6-t2i-turbo
-      expect(mockQwenProviderImage).toHaveBeenCalledWith('wanx2.6-t2i-turbo')
+    it('falls back to wan2.6-t2i by default', async () => {
+      const { imageModel } = await loadImageModule()
+
+      expect(imageModel).toBe('wan2.6-t2i')
     })
 
-    it('uses QWEN_MODEL_IMAGE env var when set', async () => {
-      const original = process.env.QWEN_MODEL_IMAGE
-      process.env.QWEN_MODEL_IMAGE = 'custom-image-model'
-      mockQwenProviderImage.mockClear()
-      vi.resetModules()
+    it('normalizes the legacy wanx2.6-t2i-turbo alias', async () => {
+      process.env.QWEN_MODEL_IMAGE = 'wanx2.6-t2i-turbo'
 
-      await import('../image')
+      const { imageModel } = await loadImageModule()
 
-      expect(mockQwenProviderImage).toHaveBeenCalledWith('custom-image-model')
-
-      // Restore
-      process.env.QWEN_MODEL_IMAGE = original
-      vi.resetModules()
+      expect(imageModel).toBe('wan2.6-t2i')
     })
   })
 
   describe('generateImage', () => {
-    it('calls sdkGenerateImage with imageModel and prompt', async () => {
-      mockSdkGenerateImage.mockResolvedValue({ images: [] })
+    it('submits a DashScope image task, polls the result, and downloads the image bytes', async () => {
+      fetchMock
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              output: {
+                task_id: 'task-123',
+              },
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            },
+          ),
+        )
+        .mockResolvedValueOnce(
+          new Response(
+            JSON.stringify({
+              output: {
+                task_status: 'SUCCEEDED',
+                results: [{ url: 'https://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/poster.png' }],
+              },
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+              },
+            },
+          ),
+        )
+        .mockResolvedValueOnce(
+          new Response(Uint8Array.from([137, 80, 78, 71]), {
+            status: 200,
+            headers: {
+              'Content-Type': 'image/png',
+            },
+          }),
+        )
 
-      await generateImage('a sunset over mountains')
+      const { generateImage } = await loadImageModule()
 
-      expect(mockSdkGenerateImage).toHaveBeenCalledWith({
-        model: imageModel,
-        prompt: 'a sunset over mountains',
+      const result = await generateImage('A cinematic rooftop concert poster', {
+        n: 1,
+        size: '1536x1024',
       })
-    })
 
-    it('passes through options (size, n)', async () => {
-      mockSdkGenerateImage.mockResolvedValue({ images: [] })
+      expect(mockAssertQwenApiKey).toHaveBeenCalledTimes(1)
+      expect(mockGetQwenApiKey).toHaveBeenCalled()
 
-      await generateImage('a cat', { size: '1024x1024', n: 2 })
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        'https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-api-key',
+            'Content-Type': 'application/json',
+            'X-DashScope-Async': 'enable',
+          }),
+        }),
+      )
 
-      expect(mockSdkGenerateImage).toHaveBeenCalledWith({
-        model: imageModel,
-        prompt: 'a cat',
-        size: '1024x1024',
-        n: 2,
+      const createTaskRequest = fetchMock.mock.calls[0]?.[1]
+      expect(createTaskRequest).toBeDefined()
+      expect(JSON.parse(String(createTaskRequest?.body))).toEqual({
+        model: 'wan2.6-t2i',
+        input: {
+          messages: [
+            {
+              role: 'user',
+              content: [{ text: 'A cinematic rooftop concert poster' }],
+            },
+          ],
+        },
+        parameters: {
+          n: 1,
+          prompt_extend: true,
+          size: '1440*960',
+          watermark: false,
+        },
       })
-    })
 
-    it('returns the raw SDK response', async () => {
-      const fakeImages = [{ base64: 'abc123', mimeType: 'image/png', uint8Array: new Uint8Array() }]
-      mockSdkGenerateImage.mockResolvedValue({ images: fakeImages })
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        'https://dashscope.aliyuncs.com/api/v1/tasks/task-123',
+        expect.objectContaining({
+          method: 'GET',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-api-key',
+          }),
+        }),
+      )
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        3,
+        'https://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/poster.png',
+        expect.objectContaining({
+          redirect: 'manual',
+          signal: expect.any(AbortSignal),
+        }),
+      )
 
-      const result = await generateImage('test prompt')
-
-      expect(result).toEqual({ images: fakeImages })
+      expect(result).toEqual({
+        images: [
+          {
+            base64: 'iVBORw==',
+            mediaType: 'image/png',
+            uint8Array: Uint8Array.from([137, 80, 78, 71]),
+          },
+        ],
+      })
     })
   })
 })

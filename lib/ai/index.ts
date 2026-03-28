@@ -1,6 +1,7 @@
 import { generateText, streamText } from 'ai'
 import type { LanguageModel } from 'ai'
 import { simpleModel, mediumModel, hardModel } from './models'
+import { assertQwenApiKey } from './provider'
 
 // Re-export model instances for callers that want direct SDK access
 export { simpleModel, mediumModel, hardModel }
@@ -28,6 +29,8 @@ export async function generate(
   prompt: string,
   options?: GenerateOptions,
 ) {
+  assertQwenApiKey()
+
   const params: Parameters<typeof generateText>[0] = {
     model: TIER_MODELS[tier],
     prompt,
@@ -42,6 +45,8 @@ export function stream(
   prompt: string,
   options?: StreamOptions,
 ) {
+  assertQwenApiKey()
+
   const params: Parameters<typeof streamText>[0] = {
     model: TIER_MODELS[tier],
     prompt,
