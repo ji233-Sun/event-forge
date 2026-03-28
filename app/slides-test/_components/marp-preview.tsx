@@ -79,10 +79,13 @@ function collectSlides(root: HTMLElement): HTMLElement[] {
   ) as HTMLElement[];
 }
 
-function wrapSlidesIntoGallery(root: HTMLElement): void {
-  const slides = collectSlides(root).slice(0, 4);
+function createGalleryMarkup(rawHtml: string): string {
+  const sandbox = document.createElement("div");
+  sandbox.innerHTML = rawHtml;
+
+  const slides = collectSlides(sandbox).slice(0, 4);
   if (slides.length === 0) {
-    return;
+    return rawHtml;
   }
 
   const gallery = document.createElement("div");
@@ -137,8 +140,9 @@ function wrapSlidesIntoGallery(root: HTMLElement): void {
     gallery.appendChild(card);
   }
 
-  root.innerHTML = "";
-  root.appendChild(gallery);
+  const container = document.createElement("div");
+  container.appendChild(gallery);
+  return container.innerHTML;
 }
 
 function scaleSlides(root: HTMLElement): void {
@@ -212,9 +216,10 @@ function MarpPreviewImpl({ values }: { values: TemplateValues }) {
         return (await response.json()) as MarpRenderResponse;
       })
       .then((payload) => {
+        const galleryHtml = createGalleryMarkup(payload.html);
         setState({
           error: null,
-          html: payload.html,
+          html: galleryHtml,
           css: payload.css,
           resolvedMarkdown: markdown,
         });
@@ -244,7 +249,6 @@ function MarpPreviewImpl({ values }: { values: TemplateValues }) {
     }
 
     const root = previewRootRef.current;
-    wrapSlidesIntoGallery(root);
     const chartInstances: Array<{ resize: () => void; dispose: () => void }> = [];
     let disposed = false;
     let rafId = 0;
