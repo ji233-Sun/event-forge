@@ -180,7 +180,15 @@ export function shuffleTemplateState(
     next[key].value = randomBiased(options, preferred, String(next[key].value), random) as TemplateStoreState[typeof key]["value"];
   }
 
-  const pair = randomFrom(FONT_PAIRS, random);
+  // Filter to pairs that change at least one unlocked font, preventing a no-op shuffle
+  const pairCandidates = FONT_PAIRS.filter(
+    ({ headingFont, bodyFont }) =>
+      (!next.headingFont.isLocked && headingFont !== next.headingFont.value) ||
+      (!next.bodyFont.isLocked && bodyFont !== next.bodyFont.value),
+  );
+  const pair = pairCandidates.length > 0
+    ? randomFrom(pairCandidates, random)
+    : randomFrom(FONT_PAIRS, random);
   if (!next.headingFont.isLocked) {
     next.headingFont.value = pair.headingFont;
   }

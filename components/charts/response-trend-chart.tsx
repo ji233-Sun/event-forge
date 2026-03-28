@@ -14,12 +14,14 @@ const _colorEl = typeof document !== 'undefined' ? document.createElement('div')
 
 /** Resolve a CSS variable to an rgb() string that echarts can parse */
 function resolveColor(varName: string): string {
-  if (!_colorEl) return '#000000'
+  if (!_colorEl) return 'transparent'
   _colorEl.style.color = `var(${varName})`
   document.documentElement.appendChild(_colorEl)
-  const computed = getComputedStyle(_colorEl).color
-  _colorEl.remove()
-  return computed || '#000000'
+  try {
+    return getComputedStyle(_colorEl).color || 'transparent'
+  } finally {
+    _colorEl.remove()
+  }
 }
 
 export function ResponseTrendChart({ data }: { data: TrendDay[] }) {

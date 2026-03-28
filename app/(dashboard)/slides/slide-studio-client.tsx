@@ -61,6 +61,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
 
   const [decks, setDecks] = useState(initialDecks)
   const [loadingDeckId, setLoadingDeckId] = useState<string | null>(null)
+  const [loadDeckError, setLoadDeckError] = useState<string | null>(null)
 
   const previewRef = useRef<SlidePreviewHandle>(null)
 
@@ -149,6 +150,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   // ── Load from history ─────────────────────────────────────────────────
   async function handleLoadDeck(id: string) {
     setLoadingDeckId(id)
+    setLoadDeckError(null)
     try {
       const { getDeck } = await import('./actions')
       const d = await getDeck(id)
@@ -159,6 +161,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       setPhase('studio')
     } catch (e) {
       console.error('Failed to load deck:', e)
+      setLoadDeckError(e instanceof Error ? e.message : 'Failed to open deck')
     } finally {
       setLoadingDeckId(null)
     }
@@ -292,6 +295,13 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             </Button>
           </div>
         </div>
+
+        {/* Load deck error */}
+        {loadDeckError && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+            {loadDeckError}
+          </div>
+        )}
 
         {/* History */}
         <div className="space-y-3">

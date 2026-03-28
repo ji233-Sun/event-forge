@@ -72,16 +72,17 @@ export function SidebarControls({
   onPresetInputChange,
 }: SidebarControlsProps) {
   const accentHex = PRIMARY_COLOR_HEX[state.primaryColor.value];
+  const presetErrorId = "preset-shortcode-error";
 
   return (
-    <aside className="h-full w-[372px] shrink-0 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 text-zinc-100">
+    <aside className="h-full w-[372px] shrink-0 overflow-hidden rounded-2xl border border-border bg-background text-foreground">
       <div className="flex h-full flex-col">
-        <div className="border-b border-zinc-800 px-6 py-6">
-          <p className="text-xs font-medium uppercase tracking-[0.24em] text-zinc-400">
+        <div className="border-b border-border px-6 py-6">
+          <p className="text-xs font-medium uppercase tracking-[0.24em] text-muted-foreground">
             Slides Test
           </p>
           <h1 className="mt-2 text-xl font-semibold leading-tight">Visual PPT Template Builder</h1>
-          <p className="mt-3 text-sm text-zinc-400">
+          <p className="mt-3 text-sm text-muted-foreground">
             Shuffle style dimensions and lock what you want to keep.
           </p>
         </div>
@@ -90,11 +91,12 @@ export function SidebarControls({
           {TEMPLATE_KEYS.map((key) => {
             const row = state[key];
             const options = TEMPLATE_OPTIONS[key];
+            const labelId = `template-label-${key}`;
 
             return (
-              <div key={key} className="space-y-2.5 rounded-xl border border-zinc-800 bg-zinc-900/70 p-4">
+              <div key={key} className="space-y-2.5 rounded-xl border border-border bg-card/70 p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-zinc-100">{TEMPLATE_LABELS[key]}</p>
+                  <p id={labelId} className="text-sm font-medium text-foreground">{TEMPLATE_LABELS[key]}</p>
                   <span
                     className="rounded-full border px-2 py-0.5 text-[11px]"
                     style={
@@ -105,9 +107,9 @@ export function SidebarControls({
                             color: accentHex,
                           }
                         : {
-                            backgroundColor: "#27272a",
-                            borderColor: "#3f3f46",
-                            color: "#a1a1aa",
+                            backgroundColor: "var(--muted)",
+                            borderColor: "var(--border)",
+                            color: "var(--muted-foreground)",
                           }
                     }
                   >
@@ -122,7 +124,10 @@ export function SidebarControls({
                     }
                     value={String(row.value)}
                   >
-                    <SelectTrigger className="w-full border-zinc-700 bg-zinc-900 text-zinc-100 focus-visible:ring-zinc-500/40">
+                    <SelectTrigger
+                      aria-labelledby={labelId}
+                      className="w-full border-border bg-card text-card-foreground focus-visible:ring-ring/40"
+                    >
                       <SelectValue placeholder="Select value" />
                     </SelectTrigger>
                     <SelectContent>
@@ -163,23 +168,32 @@ export function SidebarControls({
           })}
         </div>
 
-        <div className="space-y-4 border-t border-zinc-800 px-5 py-5">
+        <div className="space-y-4 border-t border-border px-5 py-5">
           <Button className="h-11 w-full text-base" onClick={onShuffle} type="button">
             <IconRefresh size={18} />
             Shuffle
           </Button>
 
           <div className="space-y-2">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-zinc-400">
+            <div
+              className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted-foreground"
+              id="preset-shortcode-label"
+            >
               <IconSparkles size={14} />
               Preset Shortcode
             </div>
             <Input
-              className="h-10 border-zinc-700 bg-zinc-900 font-mono text-zinc-100"
+              aria-labelledby="preset-shortcode-label"
+              aria-describedby={presetError ? presetErrorId : undefined}
+              className="h-10 border-border bg-card font-mono text-card-foreground"
               onChange={(event) => onPresetInputChange(event.target.value)}
               value={presetInput}
             />
-            {presetError ? <p className="text-xs text-rose-300">{presetError}</p> : null}
+            {presetError ? (
+              <p id={presetErrorId} className="text-xs text-destructive" role="alert">
+                {presetError}
+              </p>
+            ) : null}
           </div>
         </div>
       </div>

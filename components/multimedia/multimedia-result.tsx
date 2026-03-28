@@ -270,7 +270,10 @@ export function MultimediaResult({
     setSoundtrack(getBaseSoundtrack(result))
     setMusicError('')
     setIsGeneratingMusic(false)
-  }, [incomingPosterVariants, result])
+  // Use result.poster.imageDataUrl as a stable identifier so the effect only fires
+  // when the actual result changes — not when the parent re-renders with a new object reference.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [incomingPosterVariants, result.poster.imageDataUrl])
 
   useEffect(() => {
     return () => {

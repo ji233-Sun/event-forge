@@ -114,8 +114,8 @@ export async function POST(request: Request) {
           id: variantId,
           parentId,
           userId: session.user.id,
-          posterPrompt: prompt,
-          aspectRatio,
+          posterPrompt: poster.prompt,
+          aspectRatio: poster.aspectRatio,
           imageDataUrl: poster.imageDataUrl,
         })
         persisted = true
