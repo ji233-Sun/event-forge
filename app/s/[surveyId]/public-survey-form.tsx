@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import dynamic from 'next/dynamic'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -8,6 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { IconLoader2, IconCircleCheck, IconStarFilled } from '@tabler/icons-react'
+
+const CustomQuestionRenderer = dynamic(
+  () =>
+    import(
+      '@/app/(dashboard)/surveys/[surveyId]/components/custom-question-renderer'
+    ).then((m) => m.CustomQuestionRenderer),
+  { ssr: false, loading: () => <div className="h-20 animate-pulse rounded-lg bg-muted" /> },
+)
 
 type Question = {
   id: string
@@ -17,6 +26,8 @@ type Question = {
   required: boolean
   options: string[] | null
   order: number
+  formCodeSnapshot?: string | null
+  displayCodeSnapshot?: string | null
 }
 
 type SurveyData = {
@@ -26,20 +37,16 @@ type SurveyData = {
   questions: Question[]
 }
 
-function isMissingAnswer(value: string | string[] | undefined) {
-  if (value === undefined) {
-    return true
-  }
-
-  if (Array.isArray(value)) {
-    return value.length === 0
-  }
-
-  return value.trim().length === 0
+function isMissingAnswer(value: unknown) {
+  if (value === undefined || value === null) return true
+  if (Array.isArray(value)) return value.length === 0
+  if (typeof value === 'object') return Object.keys(value as object).length === 0
+  if (typeof value === 'string') return value.trim().length === 0
+  return false
 }
 
 export function PublicSurveyForm({ survey }: { survey: SurveyData }) {
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({})
+  const [answers, setAnswers] = useState<Record<string, unknown>>({})
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState('')
@@ -163,8 +170,8 @@ function QuestionInput({
   onChange,
 }: {
   question: Question
-  value: string | string[] | undefined
-  onChange: (value: string | string[]) => void
+  value: unknown
+  onChange: (value: unknown) => void
 }) {
   switch (question.type) {
     case 'short_text':
@@ -283,6 +290,17 @@ function QuestionInput({
       )
 
     default:
+      if (question.type.startsWith('custom:') && question.formCodeSnapshot) {
+        return (
+          <CustomQuestionRenderer
+            code={question.formCodeSnapshot}
+            mode="form"
+            value={value}
+            onChange={onChange}
+            question={{ title: question.title, description: question.description }}
+          />
+        )
+      }
       return null
   }
 }

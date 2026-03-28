@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { getSurveyDetail } from '../../actions'
+import { getUserCustomTypes } from '@/app/(dashboard)/question-types/actions'
 import { SurveyEditorClient } from './survey-editor-client'
 
 export default async function EditSurveyPage({
@@ -8,7 +9,10 @@ export default async function EditSurveyPage({
   params: Promise<{ surveyId: string }>
 }) {
   const { surveyId } = await params
-  const survey = await getSurveyDetail(surveyId)
+  const [survey, customTypes] = await Promise.all([
+    getSurveyDetail(surveyId),
+    getUserCustomTypes(),
+  ])
 
   if (!survey) {
     notFound()
@@ -17,6 +21,7 @@ export default async function EditSurveyPage({
   return (
     <SurveyEditorClient
       surveyId={surveyId}
+      customTypes={customTypes.map((t) => ({ id: t.id, name: t.name }))}
       initialSurvey={{
         title: survey.title,
         description: survey.description ?? '',

@@ -1,9 +1,15 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import {
   Card,
   CardContent,
 } from '@/components/ui/card'
+
+const CustomQuestionRenderer = dynamic(
+  () => import('./custom-question-renderer').then(m => m.CustomQuestionRenderer),
+  { ssr: false, loading: () => <div className="h-6 w-24 animate-pulse rounded bg-muted" /> }
+)
 
 const responseDateFormatter = new Intl.DateTimeFormat('en-US', {
   dateStyle: 'medium',
@@ -16,11 +22,13 @@ type Question = {
   type: string
   title: string
   options: unknown
+  formCodeSnapshot?: string | null
+  displayCodeSnapshot?: string | null
 }
 
 type ResponseData = {
   id: string
-  answers: Record<string, string | string[]>
+  answers: Record<string, string | string[] | Record<string, unknown>>
   createdAt: Date
 }
 
@@ -68,7 +76,14 @@ export function ResponsesTable({
                     </td>
                     {questions.map((q) => (
                       <td key={q.id} className="px-4 py-3 max-w-[200px] truncate">
-                        {formatAnswer(r.answers[q.id])}
+                        {isCustomType(q.type) && q.displayCodeSnapshot
+                          ? <CustomQuestionRenderer
+                              code={q.displayCodeSnapshot}
+                              mode="display"
+                              answer={r.answers[q.id]}
+                            />
+                          : formatAnswer(r.answers[q.id])
+                        }
                       </td>
                     ))}
                   </tr>
@@ -82,8 +97,13 @@ export function ResponsesTable({
   )
 }
 
-function formatAnswer(answer: string | string[] | undefined): string {
-  if (!answer) return '—'
-  if (Array.isArray(answer)) return answer.join(', ')
-  return answer
+function isCustomType(type: string) {
+  return type.startsWith('custom:')
+}
+
+function formatAnswer(value: unknown): string {
+  if (value === undefined || value === null) return '—'
+  if (Array.isArray(value)) return value.join(', ')
+  if (typeof value === 'object') return JSON.stringify(value)
+  return String(value)
 }

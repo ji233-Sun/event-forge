@@ -34,6 +34,8 @@ export default async function PublicSurveyPage({
           required: question.required,
           options: (question.options as string[] | null) ?? null,
           order: question.order,
+          formCodeSnapshot: question.formCodeSnapshot ?? null,
+          displayCodeSnapshot: question.displayCodeSnapshot ?? null,
         })),
       }}
     />

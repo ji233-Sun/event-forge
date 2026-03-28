@@ -32,6 +32,7 @@ import {
   IconChevronUp,
   IconPresentation,
   IconSparkles,
+  IconWand,
 } from '@tabler/icons-react'
 import { authClient } from '@/lib/auth-client'
 
@@ -76,7 +77,7 @@ export function AppSidebar({ user }: { user: User }) {
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel>General</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
@@ -87,6 +88,33 @@ export function AppSidebar({ user }: { user: User }) {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={pathname === '/media'}>
+                  <Link href="/media">
+                    <IconSparkles size={18} />
+                    <span>Media Studio</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === '/slides'}
+                >
+                  <Link href="/slides">
+                    <IconPresentation size={18} />
+                    <span>Slide Studio</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Surveys</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
@@ -110,21 +138,13 @@ export function AppSidebar({ user }: { user: User }) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/media'}>
-                  <Link href="/media">
-                    <IconSparkles size={18} />
-                    <span>Media Studio</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname === '/slides'}
+                  isActive={pathname === '/question-types' || pathname.startsWith('/question-types/')}
                 >
-                  <Link href="/slides">
-                    <IconPresentation size={18} />
-                    <span>Slide Studio</span>
+                  <Link href="/question-types">
+                    <IconWand size={18} />
+                    <span>Question Types</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

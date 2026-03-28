@@ -1,8 +1,8 @@
 'use server'
 
-import { eq, and, count, or } from 'drizzle-orm'
+import { eq, and, count, or, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { survey, question, response } from '@/lib/db/auth-schema'
+import { survey, question, response, customQuestionType } from '@/lib/db/auth-schema'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 
@@ -111,6 +111,7 @@ export async function publishSurvey(surveyId: string) {
   }
 
   for (const item of existing.questions) {
+    if (item.type.startsWith('custom:')) continue
     if (!isChoiceQuestion(item.type)) {
       continue
     }
@@ -197,17 +198,37 @@ export async function saveQuestions(surveyId: string, questionsInput: QuestionIn
 
     await tx.delete(question).where(eq(question.surveyId, surveyId))
     if (questionsInput.length > 0) {
+      // Build snapshot map for any custom type questions
+      const customTypeIds = questionsInput
+        .filter((q) => q.type.startsWith('custom:'))
+        .map((q) => q.type.replace('custom:', ''))
+
+      const customTypeRows = customTypeIds.length > 0
+        ? await tx.select().from(customQuestionType).where(
+            inArray(customQuestionType.id, customTypeIds)
+          )
+        : []
+
+      const typeMap = new Map(customTypeRows.map((r) => [r.id, r]))
+
       await tx.insert(question).values(
-        questionsInput.map((q) => ({
-          id: q.id || generateId(),
-          surveyId,
-          type: q.type,
-          title: q.title,
-          description: q.description || null,
-          required: q.required,
-          options: q.options || null,
-          order: q.order,
-        })),
+        questionsInput.map((q) => {
+          const customId = q.type.startsWith('custom:') ? q.type.replace('custom:', '') : null
+          const customRow = customId ? typeMap.get(customId) : undefined
+          return {
+            id: q.id || generateId(),
+            surveyId,
+            type: q.type,
+            title: q.title,
+            description: q.description || null,
+            required: q.required,
+            options: q.options || null,
+            order: q.order,
+            customTypeId: customId ?? null,
+            formCodeSnapshot: customRow?.formCode ?? null,
+            displayCodeSnapshot: customRow?.displayCode ?? null,
+          }
+        }),
       )
     }
   })

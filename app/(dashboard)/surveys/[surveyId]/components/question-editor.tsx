@@ -38,10 +38,12 @@ export function QuestionEditor({
   question,
   onChange,
   onDelete,
+  customTypes,
 }: {
   question: QuestionData
   onChange: (updated: QuestionData) => void
   onDelete: () => void
+  customTypes?: Array<{ id: string; name: string }>
 }) {
   const typeId = `type-${question.id}`
   const titleId = `title-${question.id}`
@@ -97,6 +99,13 @@ export function QuestionEditor({
               {QUESTION_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
+              {(customTypes ?? []).length > 0 && (
+                <optgroup label="Custom Types">
+                  {(customTypes ?? []).map((t) => (
+                    <option key={t.id} value={`custom:${t.id}`}>{t.name}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
             <div className="ml-auto flex items-center gap-2">

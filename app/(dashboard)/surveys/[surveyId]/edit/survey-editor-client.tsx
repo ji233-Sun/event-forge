@@ -34,9 +34,11 @@ function getErrorMessage(error: unknown, fallback: string) {
 export function SurveyEditorClient({
   surveyId,
   initialSurvey,
+  customTypes,
 }: {
   surveyId: string
   initialSurvey: SurveyEditorState
+  customTypes: Array<{ id: string; name: string }>
 }) {
   const router = useRouter()
   const title = initialSurvey.title
@@ -218,6 +220,7 @@ export function SurveyEditorClient({
                 question={question}
                 onChange={(updatedQuestion) => updateQuestion(index, updatedQuestion)}
                 onDelete={() => deleteQuestion(index)}
+                customTypes={customTypes}
               />
             ))}
 

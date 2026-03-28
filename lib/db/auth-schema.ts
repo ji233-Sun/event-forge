@@ -101,6 +101,28 @@ export const survey = pgTable(
   (table) => [index("survey_userId_idx").on(table.userId, table.createdAt)],
 );
 
+export const customQuestionType = pgTable(
+  'custom_question_type',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    description: text('description'),
+    prompt: text('prompt').notNull(),
+    formCode: text('form_code').notNull(),
+    displayCode: text('display_code').notNull(),
+    answerSchema: jsonb('answer_schema').notNull().$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index('custom_question_type_userId_idx').on(table.userId, table.createdAt)],
+);
+
 export const question = pgTable(
   "question",
   {
@@ -114,6 +136,9 @@ export const question = pgTable(
     required: boolean("required").default(false).notNull(),
     options: jsonb("options").$type<string[] | null>(),
     order: integer("order").notNull(),
+    customTypeId: text('custom_type_id').references(() => customQuestionType.id, { onDelete: 'set null' }),
+    formCodeSnapshot: text('form_code_snapshot'),
+    displayCodeSnapshot: text('display_code_snapshot'),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
       .defaultNow()
@@ -132,7 +157,7 @@ export const response = pgTable(
       .references(() => survey.id, { onDelete: "cascade" }),
     answers: jsonb("answers")
       .notNull()
-      .$type<Record<string, string | string[]>>(),
+      .$type<Record<string, string | string[] | Record<string, unknown>>>(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("response_surveyId_idx").on(table.surveyId, table.createdAt)],
@@ -145,6 +170,7 @@ export const userRelations = relations(user, ({ many }) => ({
   decks: many(deck),
   mediaGenerations: many(mediaGeneration),
   mediaGenerationVariants: many(mediaGenerationVariant),
+  customQuestionTypes: many(customQuestionType),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -218,6 +244,10 @@ export const questionRelations = relations(question, ({ one }) => ({
     fields: [question.surveyId],
     references: [survey.id],
   }),
+  customQuestionType: one(customQuestionType, {
+    fields: [question.customTypeId],
+    references: [customQuestionType.id],
+  }),
 }));
 
 export const responseRelations = relations(response, ({ one }) => ({
@@ -289,6 +319,13 @@ export const deck = pgTable(
 export const deckRelations = relations(deck, ({ one }) => ({
   user: one(user, {
     fields: [deck.userId],
+    references: [user.id],
+  }),
+}));
+
+export const customQuestionTypeRelations = relations(customQuestionType, ({ one }) => ({
+  user: one(user, {
+    fields: [customQuestionType.userId],
     references: [user.id],
   }),
 }));

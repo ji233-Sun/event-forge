@@ -20,11 +20,19 @@ export function parseSlides(markdown: string): string[] {
 
 /**
  * Extract a display title from a single slide segment.
- * Returns the text of the first # or ## heading, or `fallback`.
+ * Checks (in order): markdown # / ## heading, then HTML <h1>/<h2> tags.
+ * Returns `fallback` if neither is found.
  */
 export function getSlideTitle(segment: string, fallback: string): string {
-  const match = segment.match(/^#{1,2}\s+(.+)$/m)
-  return match ? match[1].trim() : fallback
+  // Markdown heading: # Title or ## Title
+  const mdMatch = segment.match(/^#{1,2}\s+(.+)$/m)
+  if (mdMatch) return mdMatch[1].trim()
+
+  // HTML heading: <h1>Title</h1> or <h2>Title</h2> (single line, no nested tags)
+  const htmlMatch = segment.match(/<h[12][^>]*>\s*([^<]+?)\s*<\/h[12]>/i)
+  if (htmlMatch) return htmlMatch[1].trim()
+
+  return fallback
 }
 
 /**

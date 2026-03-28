@@ -159,4 +159,14 @@
   .preview-slot-bg {
     background: linear-gradient(135deg, oklch(from var(--foreground) l c h / 0.92), oklch(from var(--foreground) l c h / 0.6));
   }
+
+  @keyframes progress {
+    0% { transform: translateX(-100%); }
+    50% { transform: translateX(0); }
+    100% { transform: translateX(100%); }
+  }
+
+  .animate-progress {
+    animation: progress 2s infinite linear;
+  }
 }

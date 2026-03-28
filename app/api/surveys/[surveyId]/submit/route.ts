@@ -2,13 +2,16 @@ import { db } from '@/lib/db'
 import { survey, response, question } from '@/lib/db/auth-schema'
 import { eq, and, or } from 'drizzle-orm'
 
-type AnswerValue = string | string[]
+type AnswerValue = string | string[] | Record<string, unknown>
 
 type SurveyQuestionRecord = {
   id: string
+  title: string
   type: string
   required: boolean
   options: string[] | null
+  formCodeSnapshot?: string | null
+  displayCodeSnapshot?: string | null
 }
 
 const ratingValues = new Set(['1', '2', '3', '4', '5'])
@@ -22,7 +25,11 @@ function normalizeOptions(options: string[] | null) {
 }
 
 function isMissingAnswer(value: AnswerValue | undefined) {
-  return value === undefined || (Array.isArray(value) ? value.length === 0 : value.length === 0)
+  if (value === undefined || value === null) return true
+  if (Array.isArray(value)) return value.length === 0
+  if (typeof value === 'object') return Object.keys(value).length === 0
+  if (typeof value === 'string') return value.trim().length === 0
+  return false
 }
 
 function validateAndNormalizeAnswers(
@@ -40,6 +47,20 @@ function validateAndNormalizeAnswers(
     const surveyQuestion = questionMap.get(questionId)
     if (!surveyQuestion) {
       return { error: 'Invalid answer set' }
+    }
+
+    if (surveyQuestion.type.startsWith('custom:')) {
+      const ans = rawValue as AnswerValue | undefined
+      // Use isMissingAnswer to check if custom field is empty.
+      // The early check here provides a better UX error message with the specific field name,
+      // which is superior to the generic "Missing required answers" from the final validation pass.
+      if (surveyQuestion.required && isMissingAnswer(ans)) {
+        return { error: `Question "${surveyQuestion.title}" is required.` }
+      }
+      if (!isMissingAnswer(ans)) {
+        normalizedAnswers[questionId] = ans as AnswerValue
+      }
+      continue
     }
 
     if (surveyQuestion.type === 'multiple_choice') {
@@ -126,7 +147,7 @@ export async function POST(
   // Load questions to validate answer keys, types, and required fields
   const qs = await db.query.question.findMany({
     where: eq(question.surveyId, s.id),
-    columns: { id: true, type: true, required: true, options: true },
+    columns: { id: true, title: true, type: true, required: true, options: true, formCodeSnapshot: true, displayCodeSnapshot: true },
   })
 
   const validation = validateAndNormalizeAnswers(rawAnswers, qs)
