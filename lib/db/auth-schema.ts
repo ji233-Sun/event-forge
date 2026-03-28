@@ -143,6 +143,7 @@ export const userRelations = relations(user, ({ many }) => ({
   accounts: many(account),
   surveys: many(survey),
   decks: many(deck),
+  mediaGenerations: many(mediaGeneration),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -158,6 +159,20 @@ export const accountRelations = relations(account, ({ one }) => ({
     references: [user.id],
   }),
 }));
+
+export const mediaGeneration = pgTable(
+  "media_generation",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    brief: text("brief").notNull(),
+    result: jsonb("result").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("media_generation_userId_idx").on(table.userId, table.createdAt)],
+);
 
 export const jwks = pgTable("jwks", {
   id: text("id").primaryKey(),
@@ -187,6 +202,13 @@ export const responseRelations = relations(response, ({ one }) => ({
   survey: one(survey, {
     fields: [response.surveyId],
     references: [survey.id],
+  }),
+}));
+
+export const mediaGenerationRelations = relations(mediaGeneration, ({ one }) => ({
+  user: one(user, {
+    fields: [mediaGeneration.userId],
+    references: [user.id],
   }),
 }));
 

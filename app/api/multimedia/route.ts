@@ -1,4 +1,6 @@
 import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
+import { mediaGeneration } from '@/lib/db/auth-schema'
 import { generateMultimediaExperience } from '@/lib/multimedia/generator'
 
 type MultimediaRequestBody = {
@@ -33,7 +35,22 @@ export async function POST(request: Request) {
 
   try {
     const data = await generateMultimediaExperience(brief)
-    return Response.json({ data })
+
+    const recordId = crypto.randomUUID()
+    let persistedId: string | null = null
+    try {
+      await db.insert(mediaGeneration).values({
+        id: recordId,
+        userId: session.user.id,
+        brief,
+        result: data,
+      })
+      persistedId = recordId
+    } catch (persistError) {
+      console.error('[multimedia route] failed to persist media history', persistError)
+    }
+
+    return Response.json({ data, id: persistedId })
   } catch (error) {
     console.error('[multimedia route] failed to generate media', error)
     return Response.json(
