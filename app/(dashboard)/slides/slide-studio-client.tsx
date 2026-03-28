@@ -592,7 +592,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           />
           <div className="flex flex-wrap items-center gap-2">
             <Button
-              onClick={slideMode === 'marp' ? () => { if (prompt.trim()) setPhase('style-pick') } : handleGenerateImages}
+              onClick={slideMode === 'marp' ? () => setPhase('style-pick') : handleGenerateImages}
               disabled={!prompt.trim()}
             >
               <IconSparkles className="mr-1 size-4" />

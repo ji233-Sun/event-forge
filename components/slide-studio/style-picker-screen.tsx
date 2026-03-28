@@ -34,14 +34,10 @@ export function StylePickerScreen({
     <div className="flex h-full flex-col">
       {/* Header bar */}
       <div className="flex shrink-0 items-center justify-between border-b px-6 py-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <IconArrowLeft size={16} />
+        <Button variant="ghost" size="sm" onClick={onBack}>
+          <IconArrowLeft size={16} className="mr-1" />
           Back
-        </button>
+        </Button>
         <p className="max-w-xs truncate text-sm font-medium text-muted-foreground">
           &ldquo;{prompt}&rdquo;
         </p>
