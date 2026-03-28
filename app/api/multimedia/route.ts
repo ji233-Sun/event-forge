@@ -2,13 +2,28 @@ import { auth } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { mediaGeneration } from '@/lib/db/auth-schema'
 import { generateMultimediaExperience } from '@/lib/multimedia/generator'
+import {
+  DEFAULT_POSTER_ASPECT_RATIO,
+  POSTER_ASPECT_RATIO_OPTIONS,
+  type PosterAspectRatio,
+} from '@/lib/multimedia/types'
 
 type MultimediaRequestBody = {
   brief?: unknown
+  aspectRatio?: unknown
 }
 
 function getBrief(body: MultimediaRequestBody) {
   return typeof body.brief === 'string' ? body.brief.trim() : ''
+}
+
+function getAspectRatio(body: MultimediaRequestBody): PosterAspectRatio {
+  const raw = body.aspectRatio
+  if (POSTER_ASPECT_RATIO_OPTIONS.some((option) => option === raw)) {
+    return raw as PosterAspectRatio
+  }
+
+  return DEFAULT_POSTER_ASPECT_RATIO
 }
 
 export async function POST(request: Request) {
@@ -19,9 +34,11 @@ export async function POST(request: Request) {
   }
 
   let brief: string
+  let aspectRatio: PosterAspectRatio
   try {
     const body = (await request.json()) as MultimediaRequestBody
     brief = getBrief(body)
+    aspectRatio = getAspectRatio(body)
   } catch {
     return Response.json({ error: 'Malformed JSON.' }, { status: 400 })
   }
@@ -34,7 +51,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const data = await generateMultimediaExperience(brief)
+    const data = await generateMultimediaExperience(brief, { aspectRatio })
 
     const recordId = crypto.randomUUID()
     let persistedId: string | null = null

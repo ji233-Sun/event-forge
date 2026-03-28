@@ -6,6 +6,19 @@ export type Soundtrack = {
   durationLabel: string
 }
 
+export const POSTER_ASPECT_RATIO_OPTIONS = ['16:9', '4:5', '1:1', '9:16'] as const
+export type PosterAspectRatio = (typeof POSTER_ASPECT_RATIO_OPTIONS)[number]
+export const DEFAULT_POSTER_ASPECT_RATIO: PosterAspectRatio = '16:9'
+
+export type PosterVariant = {
+  id: string
+  parentId: string | null
+  imageDataUrl: string
+  prompt: string
+  aspectRatio: PosterAspectRatio
+  createdAt: string
+}
+
 export const MUSIC_DURATION_OPTIONS = [15, 30, 45, 60] as const
 export const MUSIC_MOOD_OPTIONS = ['uplifting', 'cinematic', 'calm', 'energetic'] as const
 export const MUSIC_TEMPO_OPTIONS = ['slow', 'medium', 'fast'] as const
@@ -40,6 +53,7 @@ export type MultimediaExperience = {
     alt: string
     imageDataUrl: string
     prompt: string
+    aspectRatio?: PosterAspectRatio
   }
   // Optional for backward compatibility with historical records.
   soundtrack?: Soundtrack
@@ -69,4 +83,18 @@ export type MusicGenerationRequestPayload = {
 
 export type MusicGenerationResponsePayload = {
   soundtrack: Soundtrack
+}
+
+export type PosterRegenerateRequestPayload = {
+  parentId?: string | null
+  brief: string
+  conceptTitle: string
+  visualDirection: string
+  prompt: string
+  aspectRatio: PosterAspectRatio
+}
+
+export type PosterRegenerateResponsePayload = {
+  variant: PosterVariant
+  persisted: boolean
 }

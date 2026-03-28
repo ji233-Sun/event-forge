@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_POSTER_ASPECT_RATIO } from '@/lib/multimedia/types'
 
 const { mockGenerateMultimediaExperience, mockGetSession } = vi.hoisted(() => ({
   mockGenerateMultimediaExperience: vi.fn(),
@@ -94,6 +95,8 @@ describe('POST /api/multimedia', () => {
         },
       },
     })
-    expect(mockGenerateMultimediaExperience).toHaveBeenCalledWith('Launch a rooftop DJ night.')
+    expect(mockGenerateMultimediaExperience).toHaveBeenCalledWith('Launch a rooftop DJ night.', {
+      aspectRatio: DEFAULT_POSTER_ASPECT_RATIO,
+    })
   })
 })

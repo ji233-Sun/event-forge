@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DEFAULT_POSTER_ASPECT_RATIO } from '../types'
 
 vi.mock('server-only', () => ({}))
 
@@ -56,6 +57,7 @@ describe('generateMultimediaExperience', () => {
         imageDataUrl: 'data:image/png;base64,poster-base64',
         prompt:
           'Cyberpunk campus music festival poster, holographic stage, chrome haze, electric pink and acid green',
+        aspectRatio: DEFAULT_POSTER_ASPECT_RATIO,
       },
       socialCopy: {
         caption:
@@ -93,5 +95,37 @@ describe('generateMultimediaExperience', () => {
 
     expect(result.socialCopy.hashtags).toEqual(['#EventForge', '#LiveEvent'])
     expect(result.poster.imageDataUrl).toBe('data:image/webp;base64,fallback-base64')
+  })
+
+  it('uses ratio-specific image size when a portrait ratio is requested', async () => {
+    mockGenerate.mockResolvedValue({
+      text: JSON.stringify({
+        title: 'Vertical Launch Poster',
+        visualDirection: 'Tall composition with clear typography hierarchy',
+        posterPrompt: 'Vertical event poster with title area, subtitle, and footer details',
+        caption: '🎯 Story-first launch creatives for social reach.',
+        cta: 'Claim your early-access pass',
+        hashtags: ['#EventForge'],
+      }),
+    })
+    mockGenerateImage.mockResolvedValue({
+      images: [
+        {
+          base64: 'portrait-base64',
+          mediaType: 'image/png',
+        },
+      ],
+    })
+
+    const result = await generateMultimediaExperience(
+      'Build a launch poster optimized for vertical social formats.',
+      { aspectRatio: '9:16' },
+    )
+
+    expect(result.poster.aspectRatio).toBe('9:16')
+    expect(mockGenerateImage).toHaveBeenCalledWith(
+      'Vertical event poster with title area, subtitle, and footer details',
+      expect.objectContaining({ size: '864x1536' }),
+    )
   })
 })

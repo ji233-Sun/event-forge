@@ -144,6 +144,7 @@ export const userRelations = relations(user, ({ many }) => ({
   surveys: many(survey),
   decks: many(deck),
   mediaGenerations: many(mediaGeneration),
+  mediaGenerationVariants: many(mediaGenerationVariant),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -172,6 +173,27 @@ export const mediaGeneration = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("media_generation_userId_idx").on(table.userId, table.createdAt)],
+);
+
+export const mediaGenerationVariant = pgTable(
+  "media_generation_variant",
+  {
+    id: text("id").primaryKey(),
+    parentId: text("parent_id")
+      .notNull()
+      .references(() => mediaGeneration.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    posterPrompt: text("poster_prompt").notNull(),
+    aspectRatio: text("aspect_ratio").notNull(),
+    imageDataUrl: text("image_data_url").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("media_generation_variant_parentId_idx").on(table.parentId, table.createdAt),
+    index("media_generation_variant_userId_idx").on(table.userId, table.createdAt),
+  ],
 );
 
 export const jwks = pgTable("jwks", {
@@ -205,10 +227,22 @@ export const responseRelations = relations(response, ({ one }) => ({
   }),
 }));
 
-export const mediaGenerationRelations = relations(mediaGeneration, ({ one }) => ({
+export const mediaGenerationRelations = relations(mediaGeneration, ({ one, many }) => ({
   user: one(user, {
     fields: [mediaGeneration.userId],
     references: [user.id],
+  }),
+  variants: many(mediaGenerationVariant),
+}));
+
+export const mediaGenerationVariantRelations = relations(mediaGenerationVariant, ({ one }) => ({
+  user: one(user, {
+    fields: [mediaGenerationVariant.userId],
+    references: [user.id],
+  }),
+  parent: one(mediaGeneration, {
+    fields: [mediaGenerationVariant.parentId],
+    references: [mediaGeneration.id],
   }),
 }));
 
