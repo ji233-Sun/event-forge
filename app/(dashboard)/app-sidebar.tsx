@@ -86,7 +86,13 @@ export function AppSidebar({ user }: { user: User }) {
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
-                <SidebarMenuButton asChild isActive={pathname === '/surveys'}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={
+                    pathname === '/surveys' ||
+                    (pathname.startsWith('/surveys/') && pathname !== '/surveys/new')
+                  }
+                >
                   <Link href="/surveys">
                     <IconList size={18} />
                     <span>My Surveys</span>
@@ -114,7 +120,7 @@ export function AppSidebar({ user }: { user: User }) {
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton size="lg" className="cursor-pointer">
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-bold uppercase">
-                    {user.name.charAt(0)}
+                    {user.name?.charAt(0) || '?'}
                   </div>
                   <div className="min-w-0 flex-1 text-left">
                     <p className="truncate text-sm font-medium">{user.name}</p>

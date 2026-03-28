@@ -126,121 +126,121 @@ export function SurveyEditorClient({
 
   return (
     <div className="p-6 md:p-8">
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-                <Badge variant={surveyStatus === 'published' ? 'default' : 'secondary'}>
-                  {surveyStatus === 'published' ? 'Published' : 'Draft'}
-                </Badge>
-              </div>
-              {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
-            </div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <div>
             <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+              <Badge variant={surveyStatus === 'published' ? 'default' : 'secondary'}>
+                {surveyStatus === 'published' ? 'Published' : 'Draft'}
+              </Badge>
+            </div>
+            {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={() => setShowPreview((current) => !current)}
+              className="md:hidden"
+            >
+              {showPreview ? <IconEdit size={16} /> : <IconEye size={16} />}
+              {showPreview ? 'Edit' : 'Preview'}
+            </Button>
+            {surveyStatus === 'published' && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href={`/surveys/${surveyId}`}>
+                  <IconShare size={16} />
+                  View Details
+                </Link>
+              </Button>
+            )}
+            <Button size="sm" type="button" onClick={handleSave} disabled={saving || publishing}>
+              {saving ? (
+                <>
+                  <IconLoader2 size={16} className="animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <IconDeviceFloppy size={16} />
+                  Save
+                </>
+              )}
+            </Button>
+            {surveyStatus === 'draft' && questions.length > 0 && (
               <Button
-                variant="outline"
                 size="sm"
                 type="button"
-                onClick={() => setShowPreview((current) => !current)}
-                className="md:hidden"
+                onClick={handleSaveAndPublish}
+                disabled={saving || publishing}
               >
-                {showPreview ? <IconEdit size={16} /> : <IconEye size={16} />}
-                {showPreview ? 'Edit' : 'Preview'}
-              </Button>
-              {surveyStatus === 'published' && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link href={`/surveys/${surveyId}`}>
-                    <IconShare size={16} />
-                    View Details
-                  </Link>
-                </Button>
-              )}
-              <Button size="sm" type="button" onClick={handleSave} disabled={saving || publishing}>
-                {saving ? (
+                {publishing ? (
                   <>
                     <IconLoader2 size={16} className="animate-spin" />
-                    Saving...
+                    Publishing...
                   </>
                 ) : (
                   <>
-                    <IconDeviceFloppy size={16} />
-                    Save
+                    <IconCircleCheck size={16} />
+                    Save & Publish
                   </>
                 )}
               </Button>
-              {surveyStatus === 'draft' && questions.length > 0 && (
-                <Button
-                  size="sm"
-                  type="button"
-                  onClick={handleSaveAndPublish}
-                  disabled={saving || publishing}
-                >
-                  {publishing ? (
-                    <>
-                      <IconLoader2 size={16} className="animate-spin" />
-                      Publishing...
-                    </>
-                  ) : (
-                    <>
-                      <IconCircleCheck size={16} />
-                      Save & Publish
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {surveyStatus === 'published' && surveySlug && (
+        <div className="mb-6 rounded-xl border border-border/50 bg-card p-4 shadow-sm">
+          <div className="mb-2 flex items-center gap-2">
+            <IconShare size={16} className="text-primary" />
+            <span className="text-sm font-medium">Share Link</span>
+          </div>
+          <CopyLinkButton path={`/s/${surveySlug}`} />
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-[1fr_360px]">
+        <div className={showPreview ? 'hidden md:block' : ''}>
+          <div className="space-y-4">
+            {questions.map((question, index) => (
+              <QuestionEditor
+                key={question.id}
+                question={question}
+                onChange={(updatedQuestion) => updateQuestion(index, updatedQuestion)}
+                onDelete={() => deleteQuestion(index)}
+              />
+            ))}
+
+            <button
+              type="button"
+              onClick={addQuestion}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/60 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              <IconPlus size={18} />
+              Add Question
+            </button>
           </div>
         </div>
 
-        {surveyStatus === 'published' && surveySlug && (
-          <div className="mb-6 rounded-xl border border-border/50 bg-card p-4 shadow-sm">
-            <div className="mb-2 flex items-center gap-2">
-              <IconShare size={16} className="text-primary" />
-              <span className="text-sm font-medium">Share Link</span>
-            </div>
-            <CopyLinkButton path={`/s/${surveySlug}`} />
-          </div>
-        )}
-
-        {error && (
-          <div className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {error}
-          </div>
-        )}
-
-        <div className="grid gap-6 md:grid-cols-[1fr_360px]">
-          <div className={showPreview ? 'hidden md:block' : ''}>
-            <div className="space-y-4">
-              {questions.map((question, index) => (
-                <QuestionEditor
-                  key={question.id}
-                  question={question}
-                  onChange={(updatedQuestion) => updateQuestion(index, updatedQuestion)}
-                  onDelete={() => deleteQuestion(index)}
-                />
-              ))}
-
-              <button
-                type="button"
-                onClick={addQuestion}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-border/60 py-6 text-sm text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-              >
-                <IconPlus size={18} />
-                Add Question
-              </button>
-            </div>
-          </div>
-
-          <div className={showPreview ? '' : 'hidden md:block'}>
-            <div className="sticky top-24 rounded-xl border border-border/50 bg-card p-5 shadow-sm">
-              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Preview
-              </h3>
-              <SurveyPreview title={title} description={description} questions={questions} />
-            </div>
+        <div className={showPreview ? '' : 'hidden md:block'}>
+          <div className="sticky top-24 rounded-xl border border-border/50 bg-card p-5 shadow-sm">
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Preview
+            </h3>
+            <SurveyPreview title={title} description={description} questions={questions} />
           </div>
         </div>
+      </div>
     </div>
   )
 }

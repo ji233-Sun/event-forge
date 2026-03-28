@@ -25,6 +25,7 @@ import {
   IconEdit,
   IconDeviceFloppy,
 } from '@tabler/icons-react'
+import { StatusBadge } from '@/components/status-badge'
 import type { ProfileData } from './actions'
 
 type User = {
@@ -186,7 +187,7 @@ export function ProfileContent({ user, data }: { user: User; data: ProfileData }
                     </div>
                   )}
                   {profileSuccess && (
-                    <div className="mb-3 rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-400">
+                    <div className="mb-3 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
                       {profileSuccess}
                     </div>
                   )}
@@ -280,7 +281,7 @@ export function ProfileContent({ user, data }: { user: User; data: ProfileData }
                     </div>
                   )}
                   {passwordSuccess && (
-                    <div className="rounded-lg border border-green-500/20 bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-400">
+                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-400">
                       {passwordSuccess}
                     </div>
                   )}
@@ -350,7 +351,7 @@ export function ProfileContent({ user, data }: { user: User; data: ProfileData }
                             {' · '}{s.responseCount} response{s.responseCount !== 1 ? 's' : ''}
                           </p>
                         </div>
-                        <StatusBadge status={s.status} />
+                        <StatusBadge status={s.status} size="sm" />
                       </div>
                     ))}
                   </div>
@@ -392,17 +393,3 @@ function StatCard({
   )
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-amber-50 text-amber-700 border-amber-200' },
-    published: { label: 'Live', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    closed: { label: 'Closed', className: 'bg-red-50 text-red-700 border-red-200' },
-  }
-  const config = map[status] ?? { label: status, className: 'bg-muted text-muted-foreground border-border' }
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-medium ${config.className}`}>
-      <span className="h-1 w-1 rounded-full bg-current" />
-      {config.label}
-    </span>
-  )
-}

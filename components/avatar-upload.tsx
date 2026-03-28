@@ -76,9 +76,9 @@ export function AvatarUpload({
       )}
       <div className="absolute inset-0 flex items-center justify-center rounded-full bg-foreground/40 opacity-0 transition-opacity group-hover:opacity-100">
         {uploading ? (
-          <IconLoader2 size={24} className="animate-spin text-white" />
+          <IconLoader2 size={24} className="animate-spin text-background" />
         ) : (
-          <IconCamera size={24} className="text-white" />
+          <IconCamera size={24} className="text-background" />
         )}
       </div>
       <input

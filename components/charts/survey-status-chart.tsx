@@ -24,10 +24,27 @@ function resolveColor(varName: string): string {
 
 export function SurveyStatusChart({ data }: { data: StatusData }) {
   const chartRef = useRef<HTMLDivElement>(null)
+  const chartInstance = useRef<echarts.ECharts | null>(null)
 
+  // Initialize once on mount
   useEffect(() => {
     if (!chartRef.current) return
-    const chart = echarts.init(chartRef.current)
+    chartInstance.current = echarts.init(chartRef.current)
+
+    const onResize = () => chartInstance.current?.resize()
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      chartInstance.current?.dispose()
+      chartInstance.current = null
+    }
+  }, [])
+
+  // Update options when data changes
+  useEffect(() => {
+    if (!chartInstance.current) return
+
     const total = data.draft + data.published + data.closed
 
     const popover = resolveColor('--popover')
@@ -36,12 +53,11 @@ export function SurveyStatusChart({ data }: { data: StatusData }) {
     const mutedFg = resolveColor('--muted-foreground')
     const background = resolveColor('--background')
 
-    // Status-specific colors: amber for draft, green for published, red for closed
     const draftColor = resolveColor('--chart-2')
     const publishedColor = resolveColor('--chart-1')
     const closedColor = resolveColor('--chart-5')
 
-    const option: echarts.EChartsCoreOption = {
+    chartInstance.current.setOption({
       animation: true,
       animationDuration: 1200,
       animationEasing: 'cubicOut',
@@ -109,16 +125,7 @@ export function SurveyStatusChart({ data }: { data: StatusData }) {
           ],
         },
       ],
-    }
-
-    chart.setOption(option)
-
-    const onResize = () => chart.resize()
-    window.addEventListener('resize', onResize)
-    return () => {
-      window.removeEventListener('resize', onResize)
-      chart.dispose()
-    }
+    })
   }, [data])
 
   return <div ref={chartRef} className="h-[220px] w-full" />

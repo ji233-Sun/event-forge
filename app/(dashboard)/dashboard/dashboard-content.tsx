@@ -20,6 +20,7 @@ import {
   IconLayoutList,
   IconActivity,
 } from '@tabler/icons-react'
+import { StatusBadge } from '@/components/status-badge'
 import type { DashboardSurvey, DashboardStats, ResponseTrendDay } from './actions'
 
 type DashboardData = {
@@ -64,31 +65,6 @@ function StatCard({
         {sub && <div className="mt-2">{sub}</div>}
       </CardContent>
     </Card>
-  )
-}
-
-// ─── Status Badge ───
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    draft: {
-      label: 'Draft',
-      className: 'bg-amber-50 text-amber-800 border-amber-200',
-    },
-    published: {
-      label: 'Published',
-      className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    },
-    closed: {
-      label: 'Closed',
-      className: 'bg-red-50 text-red-700 border-red-200',
-    },
-  }
-  const config = map[status] ?? { label: status, className: 'bg-muted text-muted-foreground border-border' }
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-medium ${config.className}`}>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
-      {config.label}
-    </span>
   )
 }
 

@@ -60,26 +60,19 @@ export async function getProfileData(): Promise<ProfileData> {
     .innerJoin(survey, eq(response.surveyId, survey.id))
     .where(eq(survey.userId, user.id))
 
-  const [activeResult] = await db
-    .select({ count: count() })
+  // --- Status Breakdown (single grouped query) ---
+  const statusCounts = await db
+    .select({ status: survey.status, count: count() })
     .from(survey)
-    .where(and(eq(survey.userId, user.id), eq(survey.status, 'published')))
+    .where(eq(survey.userId, user.id))
+    .groupBy(survey.status)
+
+  const statusMap = new Map(statusCounts.map((r) => [r.status, r.count]))
 
   const totalSurveys = surveysResult.count
   const totalResponses = responsesResult.count
-  const activeSurveys = activeResult.count
+  const activeSurveys = statusMap.get('published') ?? 0
   const publishedRate = totalSurveys > 0 ? Math.round((activeSurveys / totalSurveys) * 100) : 0
-
-  // --- Status Breakdown ---
-  const [draftResult] = await db
-    .select({ count: count() })
-    .from(survey)
-    .where(and(eq(survey.userId, user.id), eq(survey.status, 'draft')))
-
-  const [closedResult] = await db
-    .select({ count: count() })
-    .from(survey)
-    .where(and(eq(survey.userId, user.id), eq(survey.status, 'closed')))
 
   // --- Response Trend (last 7 days) ---
   const sevenDaysAgo = new Date()
@@ -129,7 +122,7 @@ export async function getProfileData(): Promise<ProfileData> {
 
   return {
     stats: { totalSurveys, totalResponses, activeSurveys, publishedRate },
-    statusBreakdown: { draft: draftResult.count, published: activeResult.count, closed: closedResult.count },
+    statusBreakdown: { draft: statusMap.get('draft') ?? 0, published: activeSurveys, closed: statusMap.get('closed') ?? 0 },
     responseTrend,
     recentSurveys,
   }

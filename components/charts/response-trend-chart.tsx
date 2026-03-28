@@ -19,16 +19,31 @@ function cssVar(name: string): string {
 function resolveColor(varName: string): string {
   const raw = cssVar(varName)
   if (!raw) return '#888'
-  // CSS variables from globals.css use oklch values like "0.922 0.004 286.32"
   return `oklch(${raw})`
 }
 
 export function ResponseTrendChart({ data }: { data: TrendDay[] }) {
   const chartRef = useRef<HTMLDivElement>(null)
+  const chartInstance = useRef<echarts.ECharts | null>(null)
 
+  // Initialize once on mount
   useEffect(() => {
     if (!chartRef.current) return
-    const chart = echarts.init(chartRef.current)
+    chartInstance.current = echarts.init(chartRef.current)
+
+    const onResize = () => chartInstance.current?.resize()
+    window.addEventListener('resize', onResize)
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      chartInstance.current?.dispose()
+      chartInstance.current = null
+    }
+  }, [])
+
+  // Update options when data changes
+  useEffect(() => {
+    if (!chartInstance.current) return
 
     const primary = resolveColor('--primary')
     const border = resolveColor('--border')
@@ -36,7 +51,7 @@ export function ResponseTrendChart({ data }: { data: TrendDay[] }) {
     const popover = resolveColor('--popover')
     const foreground = resolveColor('--foreground')
 
-    const option: echarts.EChartsCoreOption = {
+    chartInstance.current.setOption({
       animation: true,
       animationDuration: 1200,
       animationEasing: 'cubicOut',
@@ -82,16 +97,7 @@ export function ResponseTrendChart({ data }: { data: TrendDay[] }) {
           },
         },
       ],
-    }
-
-    chart.setOption(option)
-
-    const onResize = () => chart.resize()
-    window.addEventListener('resize', onResize)
-    return () => {
-      window.removeEventListener('resize', onResize)
-      chart.dispose()
-    }
+    })
   }, [data])
 
   return <div ref={chartRef} className="h-[220px] w-full" />
