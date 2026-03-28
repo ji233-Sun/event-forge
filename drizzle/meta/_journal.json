@@ -36,6 +36,13 @@
       "when": 1774710216383,
       "tag": "0004_tranquil_gideon",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1774734845372,
+      "tag": "0005_add_deck_template_values",
+      "breakpoints": true
     }
   ]
 }

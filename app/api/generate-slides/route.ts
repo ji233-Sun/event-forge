@@ -3,7 +3,7 @@ import { generate } from "@/lib/ai";
 import { auth } from "@/lib/auth";
 import { isPlainObject } from "@/lib/api-utils";
 import { buildDynamicStyle, replaceMarkdownStyle, type Palette } from "@/lib/slides/template/css-builder";
-import { DEFAULT_TEMPLATE_VALUES, type TemplateValues } from "@/lib/slides/template/config";
+import { DEFAULT_TEMPLATE_VALUES, TEMPLATE_OPTIONS, type TemplateValues } from "@/lib/slides/template/config";
 import { headers } from "next/headers";
 
 function extractMarkdown(text: string): string {
@@ -32,11 +32,12 @@ function isChineseLanguage(language: string): boolean {
 
 function isValidTemplateValues(v: unknown): v is TemplateValues {
   if (!isPlainObject(v)) return false;
-  const keys: Array<keyof TemplateValues> = [
-    "themeMode", "baseColor", "primaryColor", "bgStyle",
-    "headingFont", "bodyFont", "cardStyle", "borderRadius",
-  ];
-  return keys.every((k) => typeof (v as Record<string, unknown>)[k] === "string");
+  return (Object.entries(TEMPLATE_OPTIONS) as Array<[keyof TemplateValues, readonly string[]]>).every(
+    ([key, options]) => {
+      const value = (v as Record<string, unknown>)[key];
+      return typeof value === "string" && (options as readonly string[]).includes(value);
+    },
+  );
 }
 
 function buildBaseSystemPrompt(language: string, templateCss: string, palette: Palette): string {

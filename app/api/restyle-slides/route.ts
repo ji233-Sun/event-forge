@@ -1,18 +1,26 @@
 import Marp from "@marp-team/marp-core";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import { isPlainObject } from "@/lib/api-utils";
 import { buildDynamicStyle, replaceEChartsColors, replaceMarkdownStyle } from "@/lib/slides/template/css-builder";
-import { DEFAULT_TEMPLATE_VALUES, type TemplateValues } from "@/lib/slides/template/config";
+import { DEFAULT_TEMPLATE_VALUES, TEMPLATE_OPTIONS, type TemplateValues } from "@/lib/slides/template/config";
 
 function isValidTemplateValues(v: unknown): v is TemplateValues {
   if (!isPlainObject(v)) return false;
-  const keys: Array<keyof TemplateValues> = [
-    "themeMode", "baseColor", "primaryColor", "bgStyle",
-    "headingFont", "bodyFont", "cardStyle", "borderRadius",
-  ];
-  return keys.every((k) => typeof (v as Record<string, unknown>)[k] === "string");
+  return (Object.entries(TEMPLATE_OPTIONS) as Array<[keyof TemplateValues, readonly string[]]>).every(
+    ([key, options]) => {
+      const value = (v as Record<string, unknown>)[key];
+      return typeof value === "string" && (options as readonly string[]).includes(value);
+    },
+  );
 }
 
 export async function POST(req: Request) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: unknown;
   try {
     body = await req.json();

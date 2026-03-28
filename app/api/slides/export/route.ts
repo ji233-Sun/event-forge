@@ -88,9 +88,10 @@ export async function POST(req: Request) {
     return new Response('No images in this deck', { status: 422 })
   }
 
-  // Fetch all images from R2 in order
+  // Fetch all images from R2 in order (skip slides without a URL — e.g. failed generates)
   const imageBuffers: ImageBuffer[] = []
   for (const img of [...row.images].sort((a, b) => a.index - b.index)) {
+    if (!img.url) continue
     const key = proxyUrlToR2Key(img.url)
     if (!key) continue
     const result = await r2GetBuffer(key)
@@ -101,7 +102,7 @@ export async function POST(req: Request) {
     return new Response('Failed to load images from storage', { status: 502 })
   }
 
-  const safeTitle = row.title.replace(/[\\/:*?"<>|]/g, '-').trim() || 'slide-deck'
+  const safeTitle = row.title.replace(/[\\/:*?"<>|\r\n]/g, '-').trim() || 'slide-deck'
 
   try {
     if (format === 'pdf') {

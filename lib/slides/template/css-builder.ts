@@ -228,7 +228,8 @@ export function replaceEChartsColors(
 
 /**
  * Replace the `style: |` block in a Marp front-matter with new CSS.
- * Leaves the front-matter closing `---` and all slide content untouched.
+ * If the block is missing, inserts it inside the front-matter.
+ * If no front-matter exists at all, prepends a minimal one.
  */
 export function replaceMarkdownStyle(markdown: string, newCss: string): string {
   const indented = newCss
@@ -237,8 +238,24 @@ export function replaceMarkdownStyle(markdown: string, newCss: string): string {
     .map((line) => `  ${line}`)
     .join("\n");
 
-  return markdown.replace(
+  const styleBlock = `style: |\n${indented}\n`;
+
+  // Case 1: existing style block — replace it
+  const replaced = markdown.replace(
     /^style: \|[\s\S]*?(?=^---\s*$)/m,
-    `style: |\n${indented}\n`
+    styleBlock,
   );
+  if (replaced !== markdown) return replaced;
+
+  // Case 2: front-matter exists without a style block — insert before closing ---
+  const hasFrontMatter = /^---\s*\n[\s\S]*?\n---\s*(\n|$)/.test(markdown);
+  if (hasFrontMatter) {
+    return markdown.replace(
+      /^(---\s*\n[\s\S]*?)(---\s*(\n|$))/,
+      (_, head, tail) => `${head}${styleBlock}${tail}`,
+    );
+  }
+
+  // Case 3: no front-matter — prepend one with the style block
+  return `---\n${styleBlock}---\n\n${markdown}`;
 }

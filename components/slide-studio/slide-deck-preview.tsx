@@ -128,7 +128,6 @@ function scaleAll(root: HTMLElement): void {
     const scale = Math.max(0.05, Math.min((cw - 4) / bw, (ch - 4) / bh));
     stage.style.transform = `scale(${scale})`;
   }
-  return anyMeasured ? undefined : undefined;
 }
 
 function SlideDeckPreviewImpl({ values }: { values: TemplateValues }) {
@@ -162,6 +161,7 @@ function SlideDeckPreviewImpl({ values }: { values: TemplateValues }) {
     const chartInstances: Array<{ resize: () => void; dispose: () => void }> = [];
     let disposed = false;
     let raf = 0;
+    const pendingRafs = new Set<number>();
     let retries = 0;
 
     const rescale = () => {
@@ -186,7 +186,10 @@ function SlideDeckPreviewImpl({ values }: { values: TemplateValues }) {
         const tryInit = () => {
           if (disposed) return;
           if (node.clientWidth <= 2 || node.clientHeight <= 2) {
-            if (attempts++ < 30) requestAnimationFrame(tryInit);
+            if (attempts++ < 30) {
+              const h = requestAnimationFrame(tryInit);
+              pendingRafs.add(h);
+            }
             return;
           }
           try {
@@ -210,6 +213,7 @@ function SlideDeckPreviewImpl({ values }: { values: TemplateValues }) {
     return () => {
       disposed = true;
       cancelAnimationFrame(raf);
+      for (const h of pendingRafs) cancelAnimationFrame(h);
       window.removeEventListener("resize", rescale);
       ro.disconnect();
       for (const chart of chartInstances) chart.dispose();

@@ -29,7 +29,7 @@ export function generateMarpMarkdown(values: TemplateValues): string {
       axisLabel: { color: palette.slideMuted },
     },
     yAxis: {
-      splitLine: { lineStyle: { color: "rgba(128,128,128,0.2)" } },
+      splitLine: { lineStyle: { color: `${palette.slideMuted}33` } },
       axisLabel: { color: palette.slideMuted },
     },
     series: [
@@ -78,7 +78,7 @@ export function generateMarpMarkdown(values: TemplateValues): string {
       axisLabel: { color: palette.slideMuted },
     },
     yAxis: {
-      splitLine: { lineStyle: { color: "rgba(128,128,128,0.2)" } },
+      splitLine: { lineStyle: { color: `${palette.slideMuted}33` } },
       axisLabel: { color: palette.slideMuted },
     },
     series: [

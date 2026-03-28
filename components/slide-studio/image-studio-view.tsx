@@ -61,6 +61,8 @@ export function ImageStudioView({ slides, deckId, deckTitle = 'Slide Deck', onBa
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       if (e.key === 'ArrowLeft') goToPrev()
       if (e.key === 'ArrowRight' || e.key === ' ') goToNext()
       if (e.key === 'Escape' && isPresenting) exitPresent()

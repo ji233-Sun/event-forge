@@ -11,6 +11,7 @@ import { parseSlides, getSlideTitle } from '@/lib/slides'
 import {
   saveDeck,
   updateDeckMarkdown,
+  updateDeckImages,
   deleteDeck,
   getDeck,
   renderMarkdown,
@@ -114,7 +115,13 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
 
       const title = getSlideTitle(parseSlides(data.markdown)[0], 'Untitled Deck')
-      const saved = await saveDeck({ title, prompt: prompt.trim(), mode: 'marp', markdown: data.markdown })
+      const saved = await saveDeck({
+        title,
+        prompt: prompt.trim(),
+        mode: 'marp',
+        markdown: data.markdown,
+        templateValues: getTemplateValues(templateState),
+      })
 
       setDeckId(saved.id)
       setDecks((prev) => [{ id: saved.id, title, prompt: prompt.trim(), mode: 'marp', createdAt: new Date() }, ...prev])
@@ -200,22 +207,18 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       return
     }
 
-    // Save to DB
-    const doneSlides = results
-      .filter((r): r is ImageSlideState & { status: 'done'; url: string } =>
-        r.status === 'done' && !!r.url,
-      )
-      .map((r): ImageSlide => ({
-        index: r.index,
-        title: r.title,
-        imagePrompt: r.imagePrompt,
-        url: r.url,
-      }))
+    // Save all slides to DB (including failed ones — url omitted for failures so retries persist)
+    const allSlides: ImageSlide[] = results.map((r) => ({
+      index: r.index,
+      title: r.title,
+      imagePrompt: r.imagePrompt,
+      ...(r.status === 'done' && r.url ? { url: r.url } : {}),
+    }))
 
     const title = planSlides[0]?.title ?? 'Untitled Image Deck'
     setImageDeckTitle(title)
     try {
-      const saved = await saveDeck({ title, prompt: prompt.trim(), mode: 'image', images: doneSlides })
+      const saved = await saveDeck({ title, prompt: prompt.trim(), mode: 'image', images: allSlides })
       setDeckId(saved.id)
       setDecks((prev) => [
         { id: saved.id, title, prompt: prompt.trim(), mode: 'image', createdAt: new Date() },
@@ -363,11 +366,21 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       })
       if (!res.ok) throw new Error('Image generation failed')
       const img = await res.json() as { index: number; url: string }
-      setImageSlideStates((prev) =>
-        prev.map((s) =>
+      setImageSlideStates((prev) => {
+        const next = prev.map((s) =>
           s.index === index ? { ...s, status: 'done' as const, url: img.url } : s
         )
-      )
+        if (deckId) {
+          const persisted: ImageSlide[] = next.map((s) => ({
+            index: s.index,
+            title: s.title,
+            imagePrompt: s.imagePrompt,
+            ...(s.status === 'done' && s.url ? { url: s.url } : {}),
+          }))
+          void updateDeckImages(deckId, persisted)
+        }
+        return next
+      })
     } catch {
       setImageSlideStates((prev) =>
         prev.map((s) => (s.index === index ? { ...s, status: 'failed' as const } : s))
@@ -383,10 +396,20 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     try {
       const d = await getDeck(id)
 
+      // Restore template state if persisted
+      if (d.templateValues) {
+        setTemplateState((prev) => {
+          const tv = d.templateValues!
+          return Object.fromEntries(
+            TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: tv[key] }])
+          ) as TemplateStoreState
+        })
+      }
+
       if (d.mode === 'image') {
         const loaded: ImageSlideState[] = (d.images ?? []).map((img) => ({
           ...img,
-          status: 'done' as const,
+          status: img.url ? ('done' as const) : ('failed' as const),
         }))
         setImageSlideStates(loaded)
         setImageDeckTitle(d.title)

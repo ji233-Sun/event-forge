@@ -43,10 +43,20 @@ describe("replaceMarkdownStyle", () => {
     expect(matches?.length).toBeGreaterThanOrEqual(3);
   });
 
-  it("returns markdown unchanged when no style block is present", () => {
+  it("inserts style block when front-matter has none", () => {
     const noStyle = "---\nmarp: true\n---\n\n# Title";
     const result = replaceMarkdownStyle(noStyle, "body {}");
-    expect(result).toBe(noStyle);
+    expect(result).toContain("style: |");
+    expect(result).toContain("  body {}");
+    expect(result).toContain("# Title");
+  });
+
+  it("prepends front-matter when markdown has none", () => {
+    const bare = "# Title\n\n- item";
+    const result = replaceMarkdownStyle(bare, "body {}");
+    expect(result.startsWith("---")).toBe(true);
+    expect(result).toContain("style: |");
+    expect(result).toContain("# Title");
   });
 
   it("indents the replacement CSS with two spaces per line", () => {

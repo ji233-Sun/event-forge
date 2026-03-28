@@ -216,7 +216,18 @@ type ImageSlideJsonb = {
   index: number
   title: string
   imagePrompt: string
-  url: string
+  url?: string
+}
+
+type TemplateValuesJsonb = {
+  themeMode: string
+  baseColor: string
+  primaryColor: string
+  bgStyle: string
+  headingFont: string
+  bodyFont: string
+  cardStyle: string
+  borderRadius: string
 }
 
 export const deck = pgTable(
@@ -228,6 +239,7 @@ export const deck = pgTable(
     mode: text("mode").notNull().default("marp"),
     markdown: text("markdown"),
     images: jsonb("images").$type<ImageSlideJsonb[] | null>(),
+    templateValues: jsonb("template_values").$type<TemplateValuesJsonb | null>(),
     userId: text("user_id")
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),

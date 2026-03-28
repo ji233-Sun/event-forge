@@ -1,10 +1,17 @@
 import Marp from "@marp-team/marp-core";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
 type RenderRequestBody = {
   markdown?: unknown;
 };
 
 export async function POST(request: Request) {
+  const session = await auth.api.getSession({ headers: await headers() });
+  if (!session?.user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: RenderRequestBody;
 
   try {

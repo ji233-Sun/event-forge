@@ -58,12 +58,16 @@ export function StylePanel({
       setPresetError(null);
       return;
     }
+    // Only validate on change; apply happens on commit (blur / Enter)
+    setPresetError(decodePreset(value) ? null : "Invalid preset shortcode");
+  };
+
+  const handlePresetCommit = (value: string) => {
+    if (!value.trim() || /^--preset\s*$/i.test(value.trim())) return;
     const parsed = decodePreset(value);
     if (parsed) {
       setPresetError(null);
       onPresetApply?.(parsed);
-    } else {
-      setPresetError("Invalid preset shortcode");
     }
   };
 
@@ -144,8 +148,13 @@ export function StylePanel({
           className="h-7 font-mono text-xs"
           value={presetInput}
           onChange={(e) => handlePresetInputChange(e.target.value)}
+          onBlur={(e) => handlePresetCommit(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handlePresetCommit((e.target as HTMLInputElement).value)
+          }}
           disabled={isLoading}
           spellCheck={false}
+          aria-label="Preset code"
         />
         {presetError && (
           <p className="text-xs text-destructive">{presetError}</p>
