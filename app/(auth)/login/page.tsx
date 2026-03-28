@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { ErrorAlert, InfoAlert } from '@/components/auth/form-alerts'
+import { PasswordToggle } from '@/components/auth/password-toggle'
 import { authClient } from '@/lib/auth-client'
 import { getOtpErrorMessage, useOtpCooldown } from '@/hooks/use-otp-cooldown'
 import { Button } from '@/components/ui/button'
@@ -16,13 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  IconAlertCircle,
-  IconCircleCheck,
-  IconEye,
-  IconEyeOff,
-  IconLoader2,
-} from '@tabler/icons-react'
+import { IconLoader2 } from '@tabler/icons-react'
 
 type Step = 'form' | 'verify'
 
@@ -44,16 +40,16 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
-    const { error } = await authClient.signIn.email({ email, password })
+    const { error: signInError } = await authClient.signIn.email({ email, password })
 
-    if (!error) {
+    if (!signInError) {
       router.push('/')
       router.refresh()
       return
     }
 
     // 邮箱未验证 → 自动发 OTP 跳转验证步骤
-    if (error.code === 'EMAIL_NOT_VERIFIED') {
+    if (signInError.code === 'EMAIL_NOT_VERIFIED') {
       const { error: otpError } = await authClient.emailOtp.sendVerificationOtp({
         email,
         type: 'email-verification',
@@ -70,7 +66,7 @@ export default function LoginPage() {
     }
 
     setLoading(false)
-    setError(error.message ?? '登录失败，请检查邮箱和密码')
+    setError(signInError.message ?? '登录失败，请检查邮箱和密码')
   }
 
   async function handleVerify(e: React.FormEvent) {
@@ -125,7 +121,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-[400px] border-border/50 shadow-xl shadow-primary/5 transition-all">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold tracking-tight">验证邮箱</CardTitle>
-          <CardDescription>验证码已发送至 {email}</CardDescription>
+          <CardDescription>完成邮箱验证后即可登录，若未收到验证码可重新发送到 {email}</CardDescription>
         </CardHeader>
 
         <form onSubmit={handleVerify}>
@@ -134,7 +130,7 @@ export default function LoginPage() {
             {info && !error && <InfoAlert message={info} />}
 
             <div className="space-y-2">
-              <Label htmlFor="otp" className="text-sm font-medium">验证码</Label>
+              <Label htmlFor="otp" className="text-sm font-medium" disabled={loading}>验证码</Label>
               <Input
                 id="otp"
                 type="text"
@@ -144,6 +140,7 @@ export default function LoginPage() {
                 required
                 autoFocus
                 className="h-11 text-center text-lg tracking-[0.5em] font-bold focus-visible:ring-primary/20"
+                disabled={loading}
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
               />
@@ -186,7 +183,7 @@ export default function LoginPage() {
           {error && <ErrorAlert message={error} />}
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">邮箱地址</Label>
+            <Label htmlFor="email" className="text-sm font-medium" disabled={loading}>邮箱地址</Label>
             <Input
               id="email"
               type="email"
@@ -194,13 +191,14 @@ export default function LoginPage() {
               autoComplete="email"
               required
               className="h-11 transition-all focus-visible:ring-primary/20"
+              disabled={loading}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">密码</Label>
+            <Label htmlFor="password" disabled={loading}>密码</Label>
             <div className="relative group">
               <Input
                 id="password"
@@ -209,17 +207,15 @@ export default function LoginPage() {
                 autoComplete="current-password"
                 required
                 className="h-11 pr-11 transition-all focus-visible:ring-primary/20"
+                disabled={loading}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-              <button
-                type="button"
-                aria-label={showPassword ? '隐藏密码' : '显示密码'}
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground group-focus-within:text-foreground"
-              >
-                {showPassword ? <IconEyeOff size={18} /> : <IconEye size={18} />}
-              </button>
+              <PasswordToggle
+                show={showPassword}
+                disabled={loading}
+                onToggle={() => setShowPassword((v) => !v)}
+              />
             </div>
           </div>
         </CardContent>
@@ -243,26 +239,5 @@ export default function LoginPage() {
         </CardFooter>
       </form>
     </Card>
-  )
-}
-
-function ErrorAlert({ message }: { message: string }) {
-  return (
-    <div
-      role="alert"
-      className="flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive border border-destructive/20 animate-in fade-in zoom-in-95 duration-200"
-    >
-      <IconAlertCircle size={18} className="shrink-0" />
-      <span className="font-medium">{message}</span>
-    </div>
-  )
-}
-
-function InfoAlert({ message }: { message: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-lg bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-400 border border-green-500/20 animate-in fade-in zoom-in-95 duration-200">
-      <IconCircleCheck size={18} className="shrink-0" />
-      <span className="font-medium">{message}</span>
-    </div>
   )
 }

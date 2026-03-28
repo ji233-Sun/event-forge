@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { ErrorAlert, InfoAlert } from '@/components/auth/form-alerts'
+import { PasswordToggle } from '@/components/auth/password-toggle'
 import { authClient } from '@/lib/auth-client'
 import { getOtpErrorMessage, useOtpCooldown } from '@/hooks/use-otp-cooldown'
 import { Button } from '@/components/ui/button'
@@ -16,13 +18,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  IconAlertCircle,
-  IconCircleCheck,
-  IconEye,
-  IconEyeOff,
-  IconLoader2,
-} from '@tabler/icons-react'
+import { IconLoader2 } from '@tabler/icons-react'
 
 type Step = 'form' | 'verify'
 
@@ -85,6 +81,7 @@ export default function RegisterPage() {
 
     if (otpError) {
       setError(otpError.message ?? '验证码发送失败，请稍后重试')
+      setStep('verify')
       return
     }
 
@@ -104,10 +101,17 @@ export default function RegisterPage() {
       otp,
     })
 
+    if (verifyError) {
+      setLoading(false)
+      setError(getOtpErrorMessage(verifyError.code))
+      return
+    }
+
+    const { error: signInError } = await authClient.signIn.email({ email, password })
     setLoading(false)
 
-    if (verifyError) {
-      setError(getOtpErrorMessage(verifyError.code))
+    if (signInError) {
+      setError(signInError.message ?? '邮箱验证成功，但自动登录失败，请使用密码重新登录')
       return
     }
 
@@ -144,7 +148,7 @@ export default function RegisterPage() {
         <CardDescription>
           {step === 'form'
             ? '只需几秒钟，开启你的 EventForge 旅程'
-            : `验证码已发送至 ${email}`}
+            : `完成邮箱验证后即可开始使用，若未收到验证码可重新发送到 ${email}`}
         </CardDescription>
       </CardHeader>
 
@@ -154,7 +158,7 @@ export default function RegisterPage() {
             {error && <ErrorAlert message={error} />}
 
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium">邮箱地址</Label>
+              <Label htmlFor="email" className="text-sm font-medium" disabled={loading}>邮箱地址</Label>
               <Input
                 id="email"
                 type="email"
@@ -162,13 +166,14 @@ export default function RegisterPage() {
                 autoComplete="email"
                 required
                 className="h-11 transition-all focus-visible:ring-primary/20"
+                disabled={loading}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">设置密码</Label>
+              <Label htmlFor="password" disabled={loading}>设置密码</Label>
               <div className="relative group">
                 <Input
                   id="password"
@@ -177,15 +182,20 @@ export default function RegisterPage() {
                   autoComplete="new-password"
                   required
                   className="h-11 pr-11 transition-all focus-visible:ring-primary/20"
+                  disabled={loading}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                <PasswordToggle show={showPassword} onToggle={() => setShowPassword((v) => !v)} />
+                <PasswordToggle
+                  show={showPassword}
+                  disabled={loading}
+                  onToggle={() => setShowPassword((v) => !v)}
+                />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirm">确认密码</Label>
+              <Label htmlFor="confirm" disabled={loading}>确认密码</Label>
               <div className="relative group">
                 <Input
                   id="confirm"
@@ -194,10 +204,15 @@ export default function RegisterPage() {
                   autoComplete="new-password"
                   required
                   className="h-11 pr-11 transition-all focus-visible:ring-primary/20"
+                  disabled={loading}
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                 />
-                <PasswordToggle show={showConfirm} onToggle={() => setShowConfirm((v) => !v)} />
+                <PasswordToggle
+                  show={showConfirm}
+                  disabled={loading}
+                  onToggle={() => setShowConfirm((v) => !v)}
+                />
               </div>
             </div>
           </CardContent>
@@ -229,7 +244,7 @@ export default function RegisterPage() {
             {info && !error && <InfoAlert message={info} />}
 
             <div className="space-y-2">
-              <Label htmlFor="otp" className="text-sm font-medium">验证码</Label>
+              <Label htmlFor="otp" className="text-sm font-medium" disabled={loading}>验证码</Label>
               <Input
                 id="otp"
                 type="text"
@@ -239,6 +254,7 @@ export default function RegisterPage() {
                 required
                 autoFocus
                 className="h-11 text-center text-lg tracking-[0.5em] font-bold focus-visible:ring-primary/20"
+                disabled={loading}
                 value={otp}
                 onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
               />
@@ -269,39 +285,5 @@ export default function RegisterPage() {
         </form>
       )}
     </Card>
-  )
-}
-
-function ErrorAlert({ message }: { message: string }) {
-  return (
-    <div
-      role="alert"
-      className="flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive border border-destructive/20 animate-in fade-in zoom-in-95 duration-200"
-    >
-      <IconAlertCircle size={18} className="shrink-0" />
-      <span className="font-medium">{message}</span>
-    </div>
-  )
-}
-
-function InfoAlert({ message }: { message: string }) {
-  return (
-    <div className="flex items-center gap-2 rounded-lg bg-green-500/10 px-4 py-3 text-sm text-green-700 dark:text-green-400 border border-green-500/20 animate-in fade-in zoom-in-95 duration-200">
-      <IconCircleCheck size={18} className="shrink-0" />
-      <span className="font-medium">{message}</span>
-    </div>
-  )
-}
-
-function PasswordToggle({ show, onToggle }: { show: boolean; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-label={show ? '隐藏密码' : '显示密码'}
-      onClick={onToggle}
-      className="absolute right-0 top-0 h-full w-11 flex items-center justify-center text-muted-foreground transition-colors hover:text-foreground group-focus-within:text-foreground"
-    >
-      {show ? <IconEyeOff size={18} /> : <IconEye size={18} />}
-    </button>
   )
 }
