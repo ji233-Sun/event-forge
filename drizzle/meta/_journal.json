@@ -8,6 +8,13 @@
       "when": 1774681665641,
       "tag": "0000_boring_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1774682178452,
+      "tag": "0001_steady_marvel_zombies",
+      "breakpoints": true
     }
   ]
 }

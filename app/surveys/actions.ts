@@ -1,6 +1,6 @@
 'use server'
 
-import { eq, and } from 'drizzle-orm'
+import { eq, and, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { survey, question, response } from '@/lib/db/survey-schema'
 import { auth } from '@/lib/auth'
@@ -157,9 +157,12 @@ export async function getSurveyBySlug(slug: string) {
   })
 }
 
-export async function getSurveyForFill(surveyId: string) {
+export async function getSurveyForFill(surveyIdOrSlug: string) {
   return db.query.survey.findFirst({
-    where: and(eq(survey.id, surveyId), eq(survey.status, 'published')),
+    where: and(
+      or(eq(survey.id, surveyIdOrSlug), eq(survey.slug, surveyIdOrSlug)),
+      eq(survey.status, 'published'),
+    ),
     with: {
       questions: { orderBy: (q, { asc }) => asc(q.order) },
     },

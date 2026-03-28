@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { saveQuestions } from '../../actions'
+import { saveQuestions, publishSurvey } from '../../actions'
 import { getSurveyDetail } from '../../actions'
 import { QuestionEditor, type QuestionData } from '../components/question-editor'
 import { SurveyPreview } from '../components/survey-preview'
+import { CopyLinkButton } from '../components/copy-link-button'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { IconArrowLeft, IconLoader2, IconPlus, IconDeviceFloppy, IconEye, IconEdit } from '@tabler/icons-react'
+import { IconArrowLeft, IconLoader2, IconPlus, IconDeviceFloppy, IconEye, IconEdit, IconCircleCheck, IconShare } from '@tabler/icons-react'
 
 export default function EditSurveyPage({ params }: { params: Promise<{ surveyId: string }> }) {
   const router = useRouter()
@@ -19,8 +20,11 @@ export default function EditSurveyPage({ params }: { params: Promise<{ surveyId:
   const [questions, setQuestions] = useState<QuestionData[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [error, setError] = useState('')
   const [showPreview, setShowPreview] = useState(false)
+  const [surveyStatus, setSurveyStatus] = useState<string>('draft')
+  const [surveySlug, setSurveySlug] = useState<string | null>(null)
 
   useEffect(() => {
     params.then(async ({ surveyId }) => {
@@ -33,6 +37,8 @@ export default function EditSurveyPage({ params }: { params: Promise<{ surveyId:
         }
         setTitle(data.title)
         setDescription(data.description ?? '')
+        setSurveyStatus(data.status)
+        setSurveySlug(data.slug)
         setQuestions(
           data.questions.map((q) => ({
             id: q.id,
@@ -91,11 +97,41 @@ export default function EditSurveyPage({ params }: { params: Promise<{ surveyId:
           order: i,
         })),
       )
-      router.push('/surveys')
+      router.push(`/surveys/${surveyId}`)
       router.refresh()
     } catch {
       setError('Failed to save questions')
+    } finally {
       setSaving(false)
+    }
+  }
+
+  async function handleSaveAndPublish() {
+    setPublishing(true)
+    setError('')
+    try {
+      await saveQuestions(
+        surveyId,
+        questions.map((q, i) => ({
+          id: q.id,
+          type: q.type,
+          title: q.title || 'Untitled Question',
+          description: q.description || undefined,
+          required: q.required,
+          options: q.options.length > 0 ? q.options : undefined,
+          order: i,
+        })),
+      )
+      const result = await publishSurvey(surveyId)
+      if (result?.slug) {
+        setSurveySlug(result.slug)
+      }
+      setSurveyStatus('published')
+      router.refresh()
+    } catch {
+      setError('Failed to save and publish')
+    } finally {
+      setPublishing(false)
     }
   }
 
@@ -134,7 +170,9 @@ export default function EditSurveyPage({ params }: { params: Promise<{ surveyId:
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
-                <Badge variant="secondary">Draft</Badge>
+                <Badge variant={surveyStatus === 'published' ? 'default' : 'secondary'}>
+                  {surveyStatus === 'published' ? 'Published' : 'Draft'}
+                </Badge>
               </div>
               {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
             </div>
@@ -148,16 +186,43 @@ export default function EditSurveyPage({ params }: { params: Promise<{ surveyId:
                 {showPreview ? <IconEdit size={16} /> : <IconEye size={16} />}
                 {showPreview ? 'Edit' : 'Preview'}
               </Button>
-              <Button size="sm" onClick={handleSave} disabled={saving}>
+              {surveyStatus === 'published' && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/surveys/${surveyId}`}>
+                    <IconShare size={16} />
+                    View Details
+                  </Link>
+                </Button>
+              )}
+              <Button size="sm" onClick={handleSave} disabled={saving || publishing}>
                 {saving ? (
                   <><IconLoader2 size={16} className="animate-spin" />Saving...</>
                 ) : (
-                  <><IconDeviceFloppy size={16} />Save Questions</>
+                  <><IconDeviceFloppy size={16} />Save</>
                 )}
               </Button>
+              {surveyStatus === 'draft' && questions.length > 0 && (
+                <Button size="sm" onClick={handleSaveAndPublish} disabled={saving || publishing}>
+                  {publishing ? (
+                    <><IconLoader2 size={16} className="animate-spin" />Publishing...</>
+                  ) : (
+                    <><IconCircleCheck size={16} />Save & Publish</>
+                  )}
+                </Button>
+              )}
             </div>
           </div>
         </div>
+
+        {surveyStatus === 'published' && surveySlug && (
+          <div className="mb-6 rounded-xl border border-border/50 bg-card p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-2">
+              <IconShare size={16} className="text-primary" />
+              <span className="text-sm font-medium">Share Link</span>
+            </div>
+            <CopyLinkButton path={`/s/${surveySlug}`} />
+          </div>
+        )}
 
         {error && (
           <div className="mb-4 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive border border-destructive/20">
