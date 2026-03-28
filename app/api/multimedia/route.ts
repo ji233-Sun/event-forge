@@ -1,3 +1,4 @@
+import { auth } from '@/lib/auth'
 import { generateMultimediaExperience } from '@/lib/multimedia/generator'
 
 type MultimediaRequestBody = {
@@ -9,6 +10,12 @@ function getBrief(body: MultimediaRequestBody) {
 }
 
 export async function POST(request: Request) {
+  const session = await auth.api.getSession({ headers: request.headers })
+
+  if (!session) {
+    return Response.json({ error: 'Authentication required.' }, { status: 401 })
+  }
+
   try {
     const body = (await request.json()) as MultimediaRequestBody
     const brief = getBrief(body)

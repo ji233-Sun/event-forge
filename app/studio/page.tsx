@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function StudioPage() {
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.12),transparent_40%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,1))]">
+    <div className="studio-bg min-h-screen">
       <Navbar />
       <main className="flex-1 pt-16">
         <MultimediaStudio />

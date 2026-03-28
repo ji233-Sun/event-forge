@@ -144,9 +144,13 @@ describe('lib/ai/image', () => {
           }),
         }),
       )
-      expect(fetchMock.mock.calls[2]).toEqual([
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        3,
         'https://cdn.example.com/poster.png',
-      ])
+        expect.objectContaining({
+          signal: expect.any(AbortSignal),
+        }),
+      )
 
       expect(result).toEqual({
         images: [

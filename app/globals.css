@@ -49,6 +49,7 @@
 }
 
 :root {
+  --poster-frame: oklch(0.1 0 0 / 90%);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -84,6 +85,7 @@
 }
 
 .dark {
+  --poster-frame: oklch(0.08 0 0 / 90%);
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
@@ -126,5 +128,17 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .studio-bg {
+    background:
+      radial-gradient(circle at top, oklch(from var(--primary) l c h / 0.12), transparent 40%),
+      linear-gradient(180deg, var(--background), var(--muted));
+  }
+
+  .preview-slot-bg {
+    background: linear-gradient(135deg, oklch(from var(--foreground) l c h / 0.92), oklch(from var(--foreground) l c h / 0.6));
   }
 }

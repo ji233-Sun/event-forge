@@ -37,7 +37,7 @@ export function MultimediaResult({
           </p>
         </div>
 
-        <div className="bg-black/90 p-4">
+        <div className="bg-[var(--poster-frame)] p-4">
           <Image
             alt={result.poster.alt}
             className="aspect-[4/3] w-full rounded-md object-cover"

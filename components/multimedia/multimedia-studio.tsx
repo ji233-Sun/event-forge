@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState } from 'react'
 import { IconArrowRight, IconSparkles, IconWaveSine } from '@tabler/icons-react'
 
 import { MultimediaResult } from '@/components/multimedia/multimedia-result'
@@ -29,7 +29,8 @@ export function MultimediaStudio() {
   const [error, setError] = useState('')
   const [result, setResult] = useState<MultimediaExperience | null>(null)
   const [copied, setCopied] = useState(false)
-  const [isPending, startTransition] = useTransition()
+  const [isLoading, setIsLoading] = useState(false)
+  const requestIdRef = useRef(0)
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -43,12 +44,12 @@ export function MultimediaStudio() {
     setCopied(false)
     setError('')
 
-    startTransition(() => {
-      void generateAssets(normalizedBrief)
-    })
+    const requestId = ++requestIdRef.current
+    setIsLoading(true)
+    void generateAssets(normalizedBrief, requestId)
   }
 
-  async function generateAssets(normalizedBrief: string) {
+  async function generateAssets(normalizedBrief: string, requestId: number) {
     try {
       const response = await fetch('/api/multimedia', {
         method: 'POST',
@@ -60,6 +61,8 @@ export function MultimediaStudio() {
 
       const payload = (await response.json()) as MultimediaApiResponse
 
+      if (requestId !== requestIdRef.current) return
+
       if (!response.ok || 'error' in payload) {
         throw new Error(
           'error' in payload
@@ -70,12 +73,17 @@ export function MultimediaStudio() {
 
       setResult(payload.data)
     } catch (requestError) {
+      if (requestId !== requestIdRef.current) return
       setResult(null)
       setError(
         requestError instanceof Error
           ? requestError.message
           : 'We could not generate multimedia assets right now.',
       )
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false)
+      }
     }
   }
 
@@ -96,7 +104,7 @@ export function MultimediaStudio() {
     <section className="relative overflow-hidden px-4 py-24 md:px-6 md:py-32">
       <div className="pointer-events-none absolute inset-0">
         <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-primary/15 blur-[140px]" />
-        <div className="absolute bottom-12 right-0 h-64 w-64 rounded-full bg-cyan-500/10 blur-[140px]" />
+        <div className="absolute bottom-12 right-0 h-64 w-64 rounded-full bg-primary/5 blur-[140px]" />
       </div>
 
       <div className="relative mx-auto max-w-6xl">
@@ -119,11 +127,12 @@ export function MultimediaStudio() {
           <Card className="border-border/60 bg-card/80 p-6 backdrop-blur-sm md:p-8">
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div className="space-y-3">
-                <Label className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground">
+                <Label className="text-sm font-medium uppercase tracking-[0.24em] text-muted-foreground" htmlFor="event-brief">
                   Event Brief
                 </Label>
                 <Textarea
                   className="min-h-48 resize-none bg-background/70 text-base leading-7"
+                  id="event-brief"
                   onChange={(event) => setBrief(event.target.value)}
                   placeholder="Describe your event, audience, mood, and the kind of campaign you want to launch."
                   value={brief}
@@ -152,12 +161,12 @@ export function MultimediaStudio() {
 
               <Button
                 className="h-11 w-full shadow-lg shadow-primary/20"
-                disabled={isPending || brief.trim().length === 0}
+                disabled={isLoading || brief.trim().length === 0}
                 size="lg"
                 type="submit"
               >
                 <IconSparkles size={18} />
-                {isPending ? 'Generating assets...' : 'Generate multimedia kit'}
+                {isLoading ? 'Generating assets...' : 'Generate multimedia kit'}
                 <IconArrowRight size={18} />
               </Button>
 
@@ -178,36 +187,36 @@ export function MultimediaStudio() {
             <MultimediaResult copied={copied} onCopy={handleCopy} result={result} />
           ) : (
             <Card className="border-dashed border-border/70 bg-card/60 p-8 backdrop-blur-sm">
-              <div className="flex h-full min-h-96 flex-col justify-between rounded-md border border-border/60 bg-[linear-gradient(135deg,rgba(24,24,27,0.92),rgba(24,24,27,0.6))] p-6 text-white">
+              <div className="preview-slot-bg flex h-full min-h-96 flex-col justify-between rounded-md border border-border/60 p-6 text-primary-foreground">
                 <div>
-                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-xs uppercase tracking-[0.24em] text-white/70">
+                  <div className="inline-flex items-center gap-2 rounded-full border border-primary-foreground/15 px-3 py-1 text-xs uppercase tracking-[0.24em] text-primary-foreground/70">
                     Preview Slot
                   </div>
                   <h2 className="mt-5 text-3xl font-semibold tracking-tight">
                     Your generated media kit appears here
                   </h2>
-                  <p className="mt-4 max-w-xl text-sm leading-7 text-white/70">
+                  <p className="mt-4 max-w-xl text-sm leading-7 text-primary-foreground/70">
                     Submit a brief to render the poster artwork, soundtrack preview, and social
                     rollout copy side by side.
                   </p>
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-md border border-white/10 bg-white/5 p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-white/50">Poster</p>
-                    <p className="mt-3 text-sm text-white/70">
+                  <div className="rounded-md border border-primary-foreground/10 bg-primary-foreground/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.24em] text-primary-foreground/50">Poster</p>
+                    <p className="mt-3 text-sm text-primary-foreground/70">
                       Data-URL artwork generated from your event atmosphere.
                     </p>
                   </div>
-                  <div className="rounded-md border border-white/10 bg-white/5 p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-white/50">Audio</p>
-                    <p className="mt-3 text-sm text-white/70">
+                  <div className="rounded-md border border-primary-foreground/10 bg-primary-foreground/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.24em] text-primary-foreground/50">Audio</p>
+                    <p className="mt-3 text-sm text-primary-foreground/70">
                       A playable soundtrack match selected for the campaign mood.
                     </p>
                   </div>
-                  <div className="rounded-md border border-white/10 bg-white/5 p-4">
-                    <p className="text-xs uppercase tracking-[0.24em] text-white/50">Copy</p>
-                    <p className="mt-3 text-sm text-white/70">
+                  <div className="rounded-md border border-primary-foreground/10 bg-primary-foreground/5 p-4">
+                    <p className="text-xs uppercase tracking-[0.24em] text-primary-foreground/50">Copy</p>
+                    <p className="mt-3 text-sm text-primary-foreground/70">
                       Launch-ready social text with CTA and reusable hashtags.
                     </p>
                   </div>

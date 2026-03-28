@@ -17,6 +17,8 @@ const MAX_WAN_DIMENSION = 1440
 const MAX_WAN_PIXELS = MAX_WAN_DIMENSION * MAX_WAN_DIMENSION
 const TASK_POLL_INTERVAL_MS = 3_000
 const TASK_TIMEOUT_MS = 120_000
+const FETCH_TIMEOUT_MS = 30_000
+const VALID_IMAGE_MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'] as const
 
 type GeneratedImage = {
   base64: string
@@ -108,6 +110,20 @@ function normalizeSize(modelId: string, size?: string) {
   return `${width}*${height}`
 }
 
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    return await fetch(url, { ...options, signal: controller.signal })
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 function buildHeaders(includeAsyncHeader: boolean) {
   return {
     Authorization: `Bearer ${getQwenApiKey()}`,
@@ -167,7 +183,7 @@ function extractImageUrls(payload: DashScopeImageResponse) {
   const urlsFromResults =
     payload.output?.results
       ?.flatMap((result) => (typeof result.url === 'string' ? [result.url] : []))
-      .filter(Boolean) ?? []
+      ?? []
 
   if (urlsFromResults.length > 0) {
     return urlsFromResults
@@ -177,7 +193,7 @@ function extractImageUrls(payload: DashScopeImageResponse) {
     payload.output?.choices
       ?.flatMap((choice) => choice.message?.content ?? [])
       .flatMap((item) => (typeof item.image === 'string' ? [item.image] : []))
-      .filter(Boolean) ?? []
+      ?? []
 
   if (urlsFromChoices.length > 0) {
     return urlsFromChoices
@@ -200,7 +216,7 @@ async function waitForTask(taskId: string) {
   const deadline = Date.now() + TASK_TIMEOUT_MS
 
   while (Date.now() <= deadline) {
-    const response = await fetch(`${qwenApiBaseURL}/tasks/${taskId}`, {
+    const response = await fetchWithTimeout(`${qwenApiBaseURL}/tasks/${taskId}`, {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${getQwenApiKey()}`,
@@ -230,7 +246,7 @@ async function waitForTask(taskId: string) {
 }
 
 async function downloadImage(url: string): Promise<GeneratedImage> {
-  const response = await fetch(url)
+  const response = await fetchWithTimeout(url, {})
 
   if (!response.ok) {
     throw new Error(
@@ -239,10 +255,16 @@ async function downloadImage(url: string): Promise<GeneratedImage> {
   }
 
   const uint8Array = new Uint8Array(await response.arrayBuffer())
+  const rawContentType = response.headers.get('content-type')?.split(';')[0]?.trim()
+  const mediaType = VALID_IMAGE_MEDIA_TYPES.includes(
+    rawContentType as (typeof VALID_IMAGE_MEDIA_TYPES)[number],
+  )
+    ? rawContentType!
+    : 'image/png'
 
   return {
     base64: Buffer.from(uint8Array).toString('base64'),
-    mediaType: response.headers.get('content-type') || 'image/png',
+    mediaType,
     uint8Array,
   }
 }
@@ -252,7 +274,7 @@ async function generateWanImage(
   prompt: string,
   options: GenerateImageOptions,
 ) {
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${qwenApiBaseURL}/services/aigc/image-generation/generation`,
     {
       method: 'POST',
@@ -275,7 +297,7 @@ async function generateQwenImage(
   prompt: string,
   options: GenerateImageOptions,
 ) {
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${qwenApiBaseURL}/services/aigc/multimodal-generation/generation`,
     {
       method: 'POST',

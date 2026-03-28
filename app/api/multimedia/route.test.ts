@@ -1,11 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-const { mockGenerateMultimediaExperience } = vi.hoisted(() => ({
+const { mockGenerateMultimediaExperience, mockGetSession } = vi.hoisted(() => ({
   mockGenerateMultimediaExperience: vi.fn(),
+  mockGetSession: vi.fn(),
 }))
 
 vi.mock('@/lib/multimedia/generator', () => ({
   generateMultimediaExperience: mockGenerateMultimediaExperience,
+}))
+
+vi.mock('@/lib/auth', () => ({
+  auth: {
+    api: {
+      getSession: mockGetSession,
+    },
+  },
 }))
 
 import { POST } from './route'
@@ -15,7 +24,26 @@ describe('POST /api/multimedia', () => {
     vi.clearAllMocks()
   })
 
+  it('returns 401 for unauthenticated requests', async () => {
+    mockGetSession.mockResolvedValue(null)
+
+    const response = await POST(
+      new Request('http://localhost/api/multimedia', {
+        method: 'POST',
+        body: JSON.stringify({ brief: 'A rooftop concert.' }),
+      }),
+    )
+
+    expect(response.status).toBe(401)
+    await expect(response.json()).resolves.toEqual({
+      error: 'Authentication required.',
+    })
+    expect(mockGenerateMultimediaExperience).not.toHaveBeenCalled()
+  })
+
   it('rejects an empty brief', async () => {
+    mockGetSession.mockResolvedValue({ user: { id: 'user-1' } })
+
     const response = await POST(
       new Request('http://localhost/api/multimedia', {
         method: 'POST',
@@ -31,6 +59,7 @@ describe('POST /api/multimedia', () => {
   })
 
   it('returns the generated multimedia payload for a valid brief', async () => {
+    mockGetSession.mockResolvedValue({ user: { id: 'user-1' } })
     mockGenerateMultimediaExperience.mockResolvedValue({
       brief: 'Launch a rooftop DJ night.',
       concept: {
