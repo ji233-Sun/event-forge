@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import Image from 'next/image'
+import Link from 'next/link'
 import {
   IconSparkles,
   IconHistory,
@@ -33,7 +34,6 @@ import {
   type MultimediaExperience,
   type PosterAspectRatio,
 } from '@/lib/multimedia/types'
-import { cn } from '@/lib/utils'
 import { getMediaHistory, type MediaHistoryItem, type MediaHistoryPage } from './actions'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -335,15 +335,6 @@ function HistoryTab({ initialData }: { initialData: MediaHistoryPage }) {
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    return () => {
-      if (copyTimeoutRef.current !== null) clearTimeout(copyTimeoutRef.current)
-    }
-  }, [])
 
   const totalPages = Math.ceil(data.total / data.pageSize)
 
@@ -354,24 +345,12 @@ function HistoryTab({ initialData }: { initialData: MediaHistoryPage }) {
       const result = await getMediaHistory(p)
       setData(result)
       setPage(p)
-      setExpandedId(null)
     } catch {
       setLoadError('Failed to load history. Please try again.')
     } finally {
       setLoading(false)
     }
   }, [])
-
-  async function handleCopy(text: string) {
-    try {
-      await navigator.clipboard.writeText(text)
-      if (copyTimeoutRef.current !== null) clearTimeout(copyTimeoutRef.current)
-      setCopied(true)
-      copyTimeoutRef.current = setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Silently fail
-    }
-  }
 
   if (data.items.length === 0) {
     return (
@@ -394,14 +373,7 @@ function HistoryTab({ initialData }: { initialData: MediaHistoryPage }) {
 
       {!loading &&
         data.items.map((item) => (
-          <HistoryCard
-            key={item.id}
-            item={item}
-            isExpanded={expandedId === item.id}
-            onToggle={() => setExpandedId(expandedId === item.id ? null : item.id)}
-            copied={copied && expandedId === item.id}
-            onCopy={() => handleCopy(item.result.socialCopy.shareText)}
-          />
+          <HistoryCard key={item.id} item={item} />
         ))}
 
       {loadError && (
@@ -439,25 +411,12 @@ function HistoryTab({ initialData }: { initialData: MediaHistoryPage }) {
   )
 }
 
-function HistoryCard({
-  item,
-  isExpanded,
-  onToggle,
-  copied,
-  onCopy,
-}: {
-  item: MediaHistoryItem
-  isExpanded: boolean
-  onToggle: () => void
-  copied: boolean
-  onCopy: () => void
-}) {
+function HistoryCard({ item }: { item: MediaHistoryItem }) {
   return (
     <Card className="overflow-hidden border-border bg-card">
-      <button
-        type="button"
+      <Link
         className="flex w-full items-center gap-4 px-4 py-4 text-left transition-colors hover:bg-muted/20 sm:px-5"
-        onClick={onToggle}
+        href={`/media/${item.id}`}
       >
         {/* Poster thumbnail */}
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-md border border-border/70 bg-muted">
@@ -478,23 +437,9 @@ function HistoryCard({
 
         <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
           <span className="hidden sm:inline">{dateFormatter.format(new Date(item.createdAt))}</span>
-          <IconChevronRight size={14} className={cn('transition-transform', isExpanded && 'rotate-90')} />
+          <IconChevronRight size={14} />
         </div>
-      </button>
-
-      {isExpanded && (
-        <div className="border-t border-border/70 p-4 sm:p-5">
-          <MultimediaResult
-            copied={copied}
-            initialPosterVariants={item.variants}
-            onCopy={onCopy}
-            parentRecordId={item.id}
-            result={item.result}
-            showMusicGenerator={false}
-            showPosterWorkspace={false}
-          />
-        </div>
-      )}
+      </Link>
     </Card>
   )
 }

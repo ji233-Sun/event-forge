@@ -42,14 +42,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import {
   DEFAULT_POSTER_ASPECT_RATIO,
-  DEFAULT_MUSIC_GENERATION_CONTROLS,
-  MUSIC_DURATION_OPTIONS,
-  MUSIC_INSTRUMENTATION_OPTIONS,
-  MUSIC_MOOD_OPTIONS,
-  MUSIC_TEMPO_OPTIONS,
   POSTER_ASPECT_RATIO_OPTIONS,
   type MultimediaExperience,
-  type MusicGenerationControls,
   type MusicGenerationResponsePayload,
   type PosterAspectRatio,
   type PosterRegenerateRequestPayload,
@@ -245,7 +239,8 @@ export function MultimediaResult({
     normaliseRatio(result.poster.aspectRatio),
   )
   const [highlightRatioControl, setHighlightRatioControl] = useState(false)
-  const [controls, setControls] = useState<MusicGenerationControls>(DEFAULT_MUSIC_GENERATION_CONTROLS)
+  const [musicPrompt, setMusicPrompt] = useState('')
+  const [withLyrics, setWithLyrics] = useState(false)
   const [soundtrack, setSoundtrack] = useState<Soundtrack | null>(() => getBaseSoundtrack(result))
   const [musicError, setMusicError] = useState('')
   const [isGeneratingMusic, setIsGeneratingMusic] = useState(false)
@@ -266,7 +261,8 @@ export function MultimediaResult({
     setBasePromptDraft(nextPromptSeed.basePrompt)
     setStyleModifiersDraft(nextPromptSeed.styleModifiers)
     setSelectedRatio(normaliseRatio(result.poster.aspectRatio))
-    setControls(DEFAULT_MUSIC_GENERATION_CONTROLS)
+    setMusicPrompt('')
+    setWithLyrics(false)
     setSoundtrack(getBaseSoundtrack(result))
     setMusicError('')
     setIsGeneratingMusic(false)
@@ -315,21 +311,9 @@ export function MultimediaResult({
 
   const hasGeneratedMusic = soundtrack !== null
 
-  const soundtrackTitle = useMemo(() => {
-    if (soundtrack) {
-      return soundtrack.title
-    }
+  const soundtrackTitle = soundtrack?.title ?? (withLyrics ? 'Generated Song' : 'Generated Instrumental')
 
-    return `${toTitle(controls.mood)} ${toTitle(controls.instrumentation)} Instrumental`
-  }, [controls.instrumentation, controls.mood, soundtrack])
-
-  const soundtrackDescription = useMemo(() => {
-    if (soundtrack) {
-      return soundtrack.description
-    }
-
-    return `Generate a ${controls.tempo} ${controls.mood} instrumental with ${controls.instrumentation}-led textures, aligned to the poster direction.`
-  }, [controls.instrumentation, controls.mood, controls.tempo, soundtrack])
+  const soundtrackDescription = soundtrack?.description ?? 'Describe the music you want and generate it on demand.'
 
   const canRegeneratePoster =
     showPosterWorkspace && !isPosterLoading && basePromptDraft.trim().length > 0
@@ -480,10 +464,9 @@ export function MultimediaResult({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          brief: result.brief,
-          conceptTitle: result.concept.title,
-          visualDirection: result.concept.visualDirection,
-          controls,
+          prompt: musicPrompt.trim() || result.concept.visualDirection,
+          withLyrics,
+          parentId: parentRecordId ?? undefined,
         }),
       })
 
@@ -505,16 +488,6 @@ export function MultimediaResult({
     } finally {
       setIsGeneratingMusic(false)
     }
-  }
-
-  function updateControl<K extends keyof MusicGenerationControls>(
-    key: K,
-    value: MusicGenerationControls[K],
-  ) {
-    setControls((prev) => ({
-      ...prev,
-      [key]: value,
-    }))
   }
 
   return (
@@ -890,85 +863,47 @@ export function MultimediaResult({
               ) : null}
             </div>
 
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="mt-5 space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Duration</Label>
-                <Select
+                <Label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">
+                  Music Prompt
+                </Label>
+                <Textarea
+                  aria-label="Music generation prompt"
+                  className="min-h-20 resize-y border-border bg-background/70 text-foreground shadow-none"
                   disabled={isGeneratingMusic}
-                  value={String(controls.durationSeconds)}
-                  onValueChange={(value) => updateControl('durationSeconds', Number(value) as MusicGenerationControls['durationSeconds'])}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select duration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MUSIC_DURATION_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={String(option)}>
-                        {option}s
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(event) => setMusicPrompt(event.target.value)}
+                  placeholder={`Describe the music you want — style, mood, energy… (defaults to poster direction)`}
+                  value={musicPrompt}
+                />
               </div>
 
-              <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Mood</Label>
-                <Select
+              <div className="flex items-center justify-between rounded-md border border-border/80 bg-background/60 px-3 py-2.5">
+                <div>
+                  <p className="text-sm font-medium">Include Lyrics</p>
+                  <p className="text-xs text-muted-foreground">
+                    {withLyrics ? 'AI will write lyrics and generate a song.' : 'Pure instrumental, no vocals.'}
+                  </p>
+                </div>
+                <button
+                  aria-label="Toggle lyrics"
+                  className={cn(
+                    'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+                    withLyrics ? 'bg-primary' : 'bg-input',
+                  )}
                   disabled={isGeneratingMusic}
-                  value={controls.mood}
-                  onValueChange={(value) => updateControl('mood', value as MusicGenerationControls['mood'])}
+                  onClick={() => setWithLyrics((prev) => !prev)}
+                  role="switch"
+                  aria-checked={withLyrics}
+                  type="button"
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select mood" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MUSIC_MOOD_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {toTitle(option)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Tempo</Label>
-                <Select
-                  disabled={isGeneratingMusic}
-                  value={controls.tempo}
-                  onValueChange={(value) => updateControl('tempo', value as MusicGenerationControls['tempo'])}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select tempo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MUSIC_TEMPO_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {toTitle(option)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Instrumentation</Label>
-                <Select
-                  disabled={isGeneratingMusic}
-                  value={controls.instrumentation}
-                  onValueChange={(value) => updateControl('instrumentation', value as MusicGenerationControls['instrumentation'])}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select instrumentation" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MUSIC_INSTRUMENTATION_OPTIONS.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {toTitle(option)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <span
+                    className={cn(
+                      'pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform',
+                      withLyrics ? 'translate-x-5' : 'translate-x-0',
+                    )}
+                  />
+                </button>
               </div>
             </div>
 
@@ -984,9 +919,21 @@ export function MultimediaResult({
             ) : null}
 
             {soundtrack ? (
-              <audio className="mt-5 w-full" controls preload="none" src={soundtrack.previewUrl}>
-                Your browser does not support audio playback.
-              </audio>
+              <div className="mt-5 space-y-3">
+                <audio className="w-full" controls preload="none" src={soundtrack.previewUrl}>
+                  Your browser does not support audio playback.
+                </audio>
+                {soundtrack.lyrics ? (
+                  <details className="rounded-md border border-border/70 bg-muted/30">
+                    <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                      Lyrics
+                    </summary>
+                    <pre className="max-h-64 overflow-y-auto whitespace-pre-wrap px-3 pb-3 pt-1 text-sm leading-6 text-foreground/80">
+                      {soundtrack.lyrics}
+                    </pre>
+                  </details>
+                ) : null}
+              </div>
             ) : (
               <p className="mt-5 text-sm text-muted-foreground">
                 Music is generated on demand and kept only in this browser session.

@@ -64,4 +64,4 @@ export function stream(
 }
 
 export { imageModel, generateImage } from './image'
-export { generateInstrumentalMusic } from './music'
+export { generateInstrumentalMusic, generateMusic } from './music'

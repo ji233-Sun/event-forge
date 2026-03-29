@@ -64,6 +64,49 @@ function isMissingVariantTableError(error: unknown): boolean {
   )
 }
 
+export async function getMediaRecord(id: string): Promise<MediaHistoryItem | null> {
+  const user = await requireAuth()
+
+  const [row] = await db
+    .select()
+    .from(mediaGeneration)
+    .where(and(eq(mediaGeneration.id, id), eq(mediaGeneration.userId, user.id)))
+    .limit(1)
+
+  if (!row) return null
+
+  let variants: MediaGenerationVariantRow[] = []
+  try {
+    variants = await db
+      .select()
+      .from(mediaGenerationVariant)
+      .where(
+        and(
+          eq(mediaGenerationVariant.userId, user.id),
+          eq(mediaGenerationVariant.parentId, id),
+        ),
+      )
+      .orderBy(desc(mediaGenerationVariant.createdAt))
+  } catch (error) {
+    if (!isMissingVariantTableError(error)) throw error
+  }
+
+  return {
+    id: row.id,
+    brief: row.brief,
+    result: row.result as MultimediaExperience,
+    variants: variants.map((v) => ({
+      id: v.id,
+      parentId: v.parentId,
+      imageDataUrl: v.imageDataUrl,
+      prompt: v.posterPrompt,
+      aspectRatio: normalizeAspectRatio(v.aspectRatio),
+      createdAt: v.createdAt.toISOString(),
+    })),
+    createdAt: row.createdAt,
+  }
+}
+
 export async function getMediaHistory(page = 1): Promise<MediaHistoryPage> {
   const user = await requireAuth()
   const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1

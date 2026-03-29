@@ -5,8 +5,10 @@ import { generateMultimediaExperience } from '@/lib/multimedia/generator'
 import {
   DEFAULT_POSTER_ASPECT_RATIO,
   POSTER_ASPECT_RATIO_OPTIONS,
+  type MultimediaExperience,
   type PosterAspectRatio,
 } from '@/lib/multimedia/types'
+import { r2Upload, r2KeyToMediaProxyUrl, dataUrlToBuffer } from '@/lib/r2'
 
 type MultimediaRequestBody = {
   brief?: unknown
@@ -51,7 +53,18 @@ export async function POST(request: Request) {
   }
 
   try {
-    const data = await generateMultimediaExperience(brief, { aspectRatio })
+    const generated = await generateMultimediaExperience(brief, { aspectRatio })
+
+    // Upload poster image to R2; replace data URL with proxy URL
+    const { buffer: imgBuffer, mediaType: imgMediaType } = dataUrlToBuffer(generated.poster.imageDataUrl)
+    const imgExt = imgMediaType.split('/')[1] ?? 'png'
+    const imgKey = `media/${session.user.id}/${crypto.randomUUID()}.${imgExt}`
+    await r2Upload(imgKey, imgBuffer, imgMediaType)
+
+    const data: MultimediaExperience = {
+      ...generated,
+      poster: { ...generated.poster, imageDataUrl: r2KeyToMediaProxyUrl(imgKey) },
+    }
 
     const recordId = crypto.randomUUID()
     let persistedId: string | null = null

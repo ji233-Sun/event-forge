@@ -69,7 +69,6 @@ export function useMusicGen() {
 
   const generate = useCallback(async (params: {
     prompt: string
-    durationSeconds?: number
     mood?: string
     tempo?: string
     instrumentation?: string

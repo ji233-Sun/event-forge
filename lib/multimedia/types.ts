@@ -4,6 +4,7 @@ export type Soundtrack = {
   description: string
   previewUrl: string
   durationLabel: string
+  lyrics?: string
 }
 
 export const POSTER_ASPECT_RATIO_OPTIONS = ['16:9', '4:5', '1:1', '9:16'] as const
@@ -19,29 +20,6 @@ export type PosterVariant = {
   createdAt: string
 }
 
-export const MUSIC_DURATION_OPTIONS = [15, 30, 45, 60] as const
-export const MUSIC_MOOD_OPTIONS = ['uplifting', 'cinematic', 'calm', 'energetic'] as const
-export const MUSIC_TEMPO_OPTIONS = ['slow', 'medium', 'fast'] as const
-export const MUSIC_INSTRUMENTATION_OPTIONS = ['synth', 'piano', 'strings', 'ambient'] as const
-
-export type MusicDurationSeconds = (typeof MUSIC_DURATION_OPTIONS)[number]
-export type MusicMood = (typeof MUSIC_MOOD_OPTIONS)[number]
-export type MusicTempo = (typeof MUSIC_TEMPO_OPTIONS)[number]
-export type MusicInstrumentation = (typeof MUSIC_INSTRUMENTATION_OPTIONS)[number]
-
-export type MusicGenerationControls = {
-  durationSeconds: MusicDurationSeconds
-  mood: MusicMood
-  tempo: MusicTempo
-  instrumentation: MusicInstrumentation
-}
-
-export const DEFAULT_MUSIC_GENERATION_CONTROLS: MusicGenerationControls = {
-  durationSeconds: 30,
-  mood: 'cinematic',
-  tempo: 'medium',
-  instrumentation: 'synth',
-}
 
 export type MultimediaExperience = {
   brief: string
@@ -75,10 +53,8 @@ export type MultimediaModelPayload = {
 }
 
 export type MusicGenerationRequestPayload = {
-  brief: string
-  conceptTitle: string
-  visualDirection: string
-  controls: MusicGenerationControls
+  prompt: string
+  withLyrics: boolean
 }
 
 export type MusicGenerationResponsePayload = {

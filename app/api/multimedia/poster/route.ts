@@ -12,6 +12,7 @@ import {
   type PosterRegenerateRequestPayload,
   type PosterRegenerateResponsePayload,
 } from '@/lib/multimedia/types'
+import { r2Upload, r2KeyToMediaProxyUrl, dataUrlToBuffer } from '@/lib/r2'
 
 type PosterRequestBody = {
   parentId?: unknown
@@ -96,12 +97,20 @@ export async function POST(request: Request) {
 
   try {
     const poster = await generatePosterAsset(prompt, aspectRatio)
+
+    // Upload poster image to R2; replace data URL with proxy URL
+    const { buffer: imgBuffer, mediaType: imgMediaType } = dataUrlToBuffer(poster.imageDataUrl)
+    const imgExt = imgMediaType.split('/')[1] ?? 'png'
+    const imgKey = `media/${session.user.id}/${crypto.randomUUID()}.${imgExt}`
+    await r2Upload(imgKey, imgBuffer, imgMediaType)
+    const posterUrl = r2KeyToMediaProxyUrl(imgKey)
+
     const variantId = crypto.randomUUID()
 
     const variant: PosterRegenerateResponsePayload['variant'] = {
       id: variantId,
       parentId,
-      imageDataUrl: poster.imageDataUrl,
+      imageDataUrl: posterUrl,
       prompt: poster.prompt,
       aspectRatio: poster.aspectRatio,
       createdAt: new Date().toISOString(),
@@ -116,7 +125,7 @@ export async function POST(request: Request) {
           userId: session.user.id,
           posterPrompt: poster.prompt,
           aspectRatio: poster.aspectRatio,
-          imageDataUrl: poster.imageDataUrl,
+          imageDataUrl: posterUrl,
         })
         persisted = true
       } catch (persistError) {
