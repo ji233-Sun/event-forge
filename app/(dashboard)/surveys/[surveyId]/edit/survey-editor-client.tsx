@@ -38,7 +38,7 @@ export function SurveyEditorClient({
 }: {
   surveyId: string
   initialSurvey: SurveyEditorState
-  customTypes: Array<{ id: string; name: string }>
+  customTypes: Array<{ id: string; name: string; formCode: string }>
 }) {
   const router = useRouter()
   const title = initialSurvey.title
@@ -191,6 +191,26 @@ export function SurveyEditorClient({
                 )}
               </Button>
             )}
+            {surveyStatus === 'closed' && questions.length > 0 && (
+              <Button
+                size="sm"
+                type="button"
+                onClick={handleSaveAndPublish}
+                disabled={saving || publishing}
+              >
+                {publishing ? (
+                  <>
+                    <IconLoader2 size={16} className="animate-spin" />
+                    Publishing...
+                  </>
+                ) : (
+                  <>
+                    <IconCircleCheck size={16} />
+                    Save & Republish
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -240,7 +260,7 @@ export function SurveyEditorClient({
             <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Preview
             </h3>
-            <SurveyPreview title={title} description={description} questions={questions} />
+            <SurveyPreview title={title} description={description} questions={questions} customTypes={customTypes} />
           </div>
         </div>
       </div>
