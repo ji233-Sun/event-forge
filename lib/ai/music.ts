@@ -118,9 +118,17 @@ function isHex(value: string) {
   return HEX_PATTERN.test(value.slice(0, FORMAT_SAMPLE_SIZE))
 }
 
+function padBase64(value: string) {
+  const remainder = value.length % 4
+  if (remainder === 0) return value
+  return value + '='.repeat(4 - remainder)
+}
+
 function isLikelyBase64(value: string) {
-  if (value.length === 0 || value.length % 4 !== 0) return false
-  return BASE64_SAMPLE_PATTERN.test(value.slice(0, FORMAT_SAMPLE_SIZE))
+  if (value.length === 0) return false
+  // Strip any existing padding so the character check is clean
+  const stripped = value.replace(/=+$/, '')
+  return BASE64_SAMPLE_PATTERN.test(stripped.slice(0, FORMAT_SAMPLE_SIZE))
 }
 
 function toDataUrl(rawAudio: string, mediaType: string) {
@@ -136,7 +144,7 @@ function toDataUrl(rawAudio: string, mediaType: string) {
   }
 
   if (isLikelyBase64(compact)) {
-    return `data:${mediaType};base64,${compact}`
+    return `data:${mediaType};base64,${padBase64(compact)}`
   }
 
   throw new Error('MiniMax returned an unsupported audio encoding format')
@@ -190,7 +198,11 @@ function normalizePreviewUrl(payload: MinimaxMusicResponse, mediaType: string) {
   }
 
   if (typeof data.audio === 'string' && data.audio.trim().length > 0) {
-    return toDataUrl(data.audio, mediaType)
+    const audio = data.audio.trim()
+    if (audio.startsWith('http://') || audio.startsWith('https://')) {
+      return audio
+    }
+    return toDataUrl(audio, mediaType)
   }
 
   throw new Error('MiniMax music generation did not return playable audio')
