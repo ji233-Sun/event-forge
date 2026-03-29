@@ -1,3 +1,5 @@
+import type { CreationMode } from '@/lib/agent-tasks/types'
+
 export type GenerateMinitoolResult = {
   suggestedName: string
   componentCode: string  // audience component, noInline JSX string
@@ -12,6 +14,8 @@ export type MinitoolRecord = {
   componentCode: string
   hostCode: string
   isPublic: boolean
+  creationMode: CreationMode
+  agentTaskId: string | null
   createdAt: Date
   updatedAt: Date
 }

@@ -102,6 +102,52 @@ export const survey = pgTable(
   (table) => [index("survey_userId_idx").on(table.userId, table.createdAt)],
 );
 
+export const agentTask = pgTable(
+  'agent_task',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    resourceKind: text('resource_kind').notNull(),
+    originalPrompt: text('original_prompt').notNull(),
+    status: text('status').default('open').notNull(),
+    latestDraft: jsonb('latest_draft').$type<Record<string, unknown> | null>(),
+    latestDraftName: text('latest_draft_name'),
+    savedEntityId: text('saved_entity_id'),
+    skillVersion: text('skill_version').default('v1').notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index('agent_task_userId_idx').on(table.userId, table.createdAt)],
+)
+
+export const agentTaskTurn = pgTable(
+  'agent_task_turn',
+  {
+    id: text('id').primaryKey(),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => agentTask.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    status: text('status').default('pending').notNull(),
+    requestPayload: jsonb('request_payload').notNull().$type<Record<string, unknown>>(),
+    tokenHash: text('token_hash').notNull(),
+    tokenExpiresAt: timestamp('token_expires_at').notNull(),
+    submittedResult: jsonb('submitted_result').$type<Record<string, unknown> | null>(),
+    submittedAt: timestamp('submitted_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index('agent_task_turn_taskId_idx').on(table.taskId, table.createdAt)],
+)
+
 export const customQuestionType = pgTable(
   'custom_question_type',
   {
@@ -115,6 +161,8 @@ export const customQuestionType = pgTable(
     formCode: text('form_code').notNull(),
     displayCode: text('display_code').notNull(),
     answerSchema: jsonb('answer_schema').notNull().$type<Record<string, unknown>>(),
+    creationMode: text('creation_mode').default('built_in_ai').notNull(),
+    agentTaskId: text('agent_task_id').references(() => agentTask.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
       .defaultNow()
@@ -176,6 +224,8 @@ export const minitool = pgTable(
     componentCode: text('component_code').notNull(),
     hostCode: text('host_code').notNull(),
     isPublic: boolean('is_public').default(false).notNull(),
+    creationMode: text('creation_mode').default('built_in_ai').notNull(),
+    agentTaskId: text('agent_task_id').references(() => agentTask.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
       .defaultNow()
@@ -222,6 +272,7 @@ export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
   surveys: many(survey),
+  agentTasks: many(agentTask),
   decks: many(deck),
   mediaGenerations: many(mediaGeneration),
   mediaGenerationVariants: many(mediaGenerationVariant),
