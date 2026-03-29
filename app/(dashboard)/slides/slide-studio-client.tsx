@@ -331,6 +331,17 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     void handleRestyle(prevValues, getTemplateValues(newState))
   }, [templateState, handleRestyle])
 
+  // Studio-specific handler: updates state AND triggers restyle API
+  const handleStudioValueChange = useCallback(
+    <K extends TemplateKey>(key: K, value: TemplateValues[K]) => {
+      const prevValues = getTemplateValues(templateState)
+      const newValues = { ...prevValues, [key]: value }
+      setTemplateState((prev) => setTemplateValue(prev, key, value))
+      void handleRestyle(prevValues, newValues as TemplateValues)
+    },
+    [templateState, handleRestyle]
+  )
+
   // Apply a decoded preset in Studio: restyle with ECharts color replacement
   const handleStudioPresetApply = useCallback((newValues: TemplateValues) => {
     const prevValues = getTemplateValues(templateState)
@@ -593,7 +604,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
                   state={templateState}
                   isLoading={isRestyling}
                   error={restyleError}
-                  onValueChange={handleTemplateValueChange}
+                  onValueChange={handleStudioValueChange}
                   onToggleLock={handleToggleLock}
                   onShuffle={handleShuffle}
                   onPresetApply={handleStudioPresetApply}

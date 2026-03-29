@@ -150,7 +150,7 @@ export function buildDynamicStyle(values: TemplateValues): { style: string; pale
 
 section {
   ${bg}
-  color: var(--slide-text);
+  color: var(--slide-text, ${palette.slideText});
   font-family: ${bodyFont};
   padding: 50px;
   line-height: 1.42;
@@ -160,28 +160,28 @@ section::before {
   content: "";
   position: absolute;
   inset: 14px;
-  border-radius: calc(var(--radius) + 6px);
-  border: 1px solid var(--card-border);
+  border-radius: calc(var(--radius, ${radius}) + 6px);
+  border: 1px solid var(--card-border, ${palette.cardBorder});
   pointer-events: none;
 }
 
 h1, h2, h3 { font-family: ${headingFont}; margin: 0 0 14px; letter-spacing: 0.4px; }
-h1 { color: var(--color-primary); font-size: 58px; }
-h2 { color: var(--color-secondary); font-size: 38px; }
-h3 { color: var(--color-accent); font-size: 28px; }
+h1 { color: var(--color-primary, ${palette.primary}); font-size: 58px; }
+h2 { color: var(--color-secondary, ${palette.secondary}); font-size: 38px; }
+h3 { color: var(--color-accent, ${palette.accent}); font-size: 28px; }
 p, li { font-size: 22px; }
-strong { color: var(--color-primary); }
+strong { color: var(--color-primary, ${palette.primary}); }
 
 .cover h1 { text-align: center; margin-top: 42px; }
-.cover p { text-align: center; color: var(--color-accent); font-size: 28px; }
+.cover p { text-align: center; color: var(--color-accent, ${palette.accent}); font-size: 28px; }
 
-.panel { margin-top: 12px; border-radius: var(--radius); padding: 14px 16px; }
+.panel { margin-top: 12px; border-radius: var(--radius, ${radius}); padding: 14px 16px; }
 .two-col { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 18px; align-items: start; }
 .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 14px; }
-.kpi { border-radius: var(--radius); padding: 14px; }
-.kpi .label { color: var(--slide-muted); font-size: 15px; }
-.kpi .value { color: var(--color-accent); font-size: 34px; font-weight: 700; }
-.timeline-item { border-left: 3px solid var(--color-primary); padding-left: 12px; margin: 10px 0; }
+.kpi { border-radius: var(--radius, ${radius}); padding: 14px; }
+.kpi .label { color: var(--slide-muted, ${palette.slideMuted}); font-size: 15px; }
+.kpi .value { color: var(--color-accent, ${palette.accent}); font-size: 34px; font-weight: 700; }
+.timeline-item { border-left: 3px solid var(--color-primary, ${palette.primary}); padding-left: 12px; margin: 10px 0; }
 
 .echarts-chart {
   width: 100%;
