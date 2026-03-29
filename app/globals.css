@@ -162,11 +162,10 @@
 
   @keyframes progress {
     0% { transform: translateX(-100%); }
-    50% { transform: translateX(0); }
-    100% { transform: translateX(100%); }
+    100% { transform: translateX(300%); }
   }
 
   .animate-progress {
-    animation: progress 2s infinite linear;
+    animation: progress 1.5s infinite ease-in-out;
   }
 }

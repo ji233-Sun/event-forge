@@ -68,7 +68,8 @@ export async function POST(request: Request) {
       prompt: `Create a custom survey question type for: ${prompt.trim()}`,
     })
 
-    const cleaned = result.text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
+    const withoutThinking = result.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+    const cleaned = withoutThinking.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
     const parsed = JSON.parse(cleaned)
 
     if (!parsed.formCode || !parsed.displayCode || !parsed.answerSchema || !parsed.suggestedName) {
