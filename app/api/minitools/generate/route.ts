@@ -1,5 +1,6 @@
 import { generateText } from 'ai'
 import { getModel } from '@/lib/ai'
+import { assertMinimaxApiKey } from '@/lib/ai/provider'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 
@@ -63,6 +64,8 @@ AI HOOKS (optional):
 STYLING: Use Tailwind classes. All UI text must be in English.`
 
 export async function POST(request: Request) {
+  assertMinimaxApiKey()
+
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) {
     return Response.json({ error: 'Authentication required.' }, { status: 401 })

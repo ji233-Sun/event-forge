@@ -9,6 +9,7 @@ const { mockGetSession, mockGenerateText, mockHeaders } = vi.hoisted(() => ({
 vi.mock('@/lib/auth', () => ({ auth: { api: { getSession: mockGetSession } } }))
 vi.mock('ai', () => ({ generateText: mockGenerateText }))
 vi.mock('@/lib/ai', () => ({ getModel: vi.fn(() => 'mock-model') }))
+vi.mock('@/lib/ai/provider', () => ({ assertMinimaxApiKey: vi.fn() }))
 vi.mock('next/headers', () => ({ headers: mockHeaders }))
 
 import { POST } from './route'

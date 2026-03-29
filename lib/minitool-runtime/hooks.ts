@@ -43,8 +43,8 @@ export function createUseSharedData(minitoolId: string) {
         .then((r) => r.json())
         .then((j) => { setData((j.data as T) ?? null); setIsLoading(false) })
         .catch(() => setIsLoading(false))
-    // Empty dependency array is intentional: minitoolId and visitorId are captured
-    // from the factory closure at hook-creation time and never change during the hook's lifetime.
+    // Empty dependency array is intentional: minitoolId is captured
+    // from the factory closure at hook-creation time and never changes during the hook's lifetime.
     }, [])
 
     const save = useCallback(async (newData: T) => {
@@ -54,8 +54,8 @@ export function createUseSharedData(minitoolId: string) {
         body: JSON.stringify({ data: newData }),
       })
       setData(newData)
-    // Empty dependency array is intentional: minitoolId and visitorId are captured
-    // from the factory closure at hook-creation time and never change during the hook's lifetime.
+    // Empty dependency array is intentional: minitoolId is captured
+    // from the factory closure at hook-creation time and never changes during the hook's lifetime.
     }, [])
 
     return { data, isLoading, save }
