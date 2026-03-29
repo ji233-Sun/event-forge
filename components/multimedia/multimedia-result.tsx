@@ -261,7 +261,6 @@ export function MultimediaResult({
     setStyleModifiersDraft(nextPromptSeed.styleModifiers)
     setSelectedRatio(normaliseRatio(result.poster.aspectRatio))
     setMusicPrompt('')
-    setWithLyrics(false)
     setSoundtrack(getBaseSoundtrack(result))
     setMusicError('')
     setIsGeneratingMusic(false)
