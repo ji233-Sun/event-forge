@@ -1,15 +1,6 @@
-'use client'
-
-import dynamic from 'next/dynamic'
-import {
-  Card,
-  CardContent,
-} from '@/components/ui/card'
-
-const CustomQuestionRenderer = dynamic(
-  () => import('./custom-question-renderer').then(m => m.CustomQuestionRenderer),
-  { ssr: false, loading: () => <div className="h-6 w-24 animate-pulse rounded bg-muted" /> }
-)
+import Link from 'next/link'
+import { Card, CardContent } from '@/components/ui/card'
+import { getPreview } from '@/app/(dashboard)/surveys/lib/format-answer'
 
 const responseDateFormatter = new Intl.DateTimeFormat('en-US', {
   dateStyle: 'medium',
@@ -28,14 +19,16 @@ type Question = {
 
 type ResponseData = {
   id: string
-  answers: Record<string, string | string[] | Record<string, unknown>>
+  answers: Record<string, unknown>
   createdAt: Date
 }
 
 export function ResponsesTable({
+  surveyId,
   questions,
   responses,
 }: {
+  surveyId: string
   questions: Question[]
   responses: ResponseData[]
 }) {
@@ -51,59 +44,42 @@ export function ResponsesTable({
   }
 
   return (
-    <div className="space-y-4">
-      <Card className="border-border/50 overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">#</th>
-                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Date</th>
-                  {questions.map((q) => (
-                    <th key={q.id} className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">
-                      {q.title}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {responses.map((r, i) => (
-                  <tr key={r.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
-                    <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
-                    <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
-                      {responseDateFormatter.format(new Date(r.createdAt))}
-                    </td>
-                    {questions.map((q) => (
-                      <td key={q.id} className="px-4 py-3 max-w-[200px] truncate">
-                        {isCustomType(q.type) && q.displayCodeSnapshot
-                          ? <CustomQuestionRenderer
-                              code={q.displayCodeSnapshot}
-                              mode="display"
-                              answer={r.answers[q.id]}
-                            />
-                          : formatAnswer(r.answers[q.id])
-                        }
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    <Card className="border-border/50 overflow-hidden">
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/50">
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground w-10">#</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap">Date</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Preview</th>
+              <th className="px-4 py-3 text-right font-medium text-muted-foreground w-24">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {responses.map((r, i) => (
+              <tr key={r.id} className="border-b border-border/50 last:border-0 hover:bg-muted/30">
+                <td className="px-4 py-3 text-muted-foreground">{i + 1}</td>
+                <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                  {responseDateFormatter.format(new Date(r.createdAt))}
+                </td>
+                <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
+                  {getPreview(r.answers, questions)}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    href={`/surveys/${surveyId}/responses/${r.id}`}
+                    className="text-sm font-medium text-primary hover:underline"
+                  >
+                    Details →
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          </table>
+        </div>
+      </CardContent>
+    </Card>
   )
-}
-
-function isCustomType(type: string) {
-  return type.startsWith('custom:')
-}
-
-function formatAnswer(value: unknown): string {
-  if (value === undefined || value === null) return '—'
-  if (Array.isArray(value)) return value.join(', ')
-  if (typeof value === 'object') return JSON.stringify(value)
-  return String(value)
 }

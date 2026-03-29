@@ -120,6 +120,7 @@ export default async function SurveyDetailPage({
 
           <TabsContent value="responses" className="mt-6">
             <ResponsesTable
+              surveyId={surveyId}
               questions={data.questions}
               responses={data.responses}
             />
