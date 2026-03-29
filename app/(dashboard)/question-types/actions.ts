@@ -26,6 +26,7 @@ export async function getUserCustomTypes() {
       id: customQuestionType.id,
       name: customQuestionType.name,
       prompt: customQuestionType.prompt,
+      formCode: customQuestionType.formCode,
       createdAt: customQuestionType.createdAt,
       usageCount: sql<number>`count(${question.id})::int`,
     })

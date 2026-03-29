@@ -21,7 +21,7 @@ export default async function EditSurveyPage({
   return (
     <SurveyEditorClient
       surveyId={surveyId}
-      customTypes={customTypes.map((t) => ({ id: t.id, name: t.name }))}
+      customTypes={customTypes.map((t) => ({ id: t.id, name: t.name, formCode: t.formCode }))}
       initialSurvey={{
         title: survey.title,
         description: survey.description ?? '',
