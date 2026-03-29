@@ -50,16 +50,17 @@ type AgentTaskCreatePayload = {
   feedback?: string
 }
 
-function getInitialMode(searchParams: ReturnType<typeof useSearchParams>): CreationMode {
-  return searchParams.get('mode') === 'agent' ? 'my_agent' : 'built_in_ai'
+function getInitialMode(modeParam: string | null): CreationMode {
+  return modeParam === 'agent' ? 'my_agent' : 'built_in_ai'
 }
 
 export default function NewQuestionTypePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editId = searchParams.get('id')
+  const modeParam = searchParams.get('mode')
 
-  const [mode, setMode] = useState<CreationMode>(getInitialMode(searchParams))
+  const [mode, setMode] = useState<CreationMode>(getInitialMode(modeParam))
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isIterating, setIsIterating] = useState(false)
@@ -109,7 +110,7 @@ export default function NewQuestionTypePage() {
 
   useEffect(() => {
     if (!editId) {
-      setMode(getInitialMode(searchParams))
+      setMode(getInitialMode(modeParam))
       return
     }
 
@@ -131,7 +132,7 @@ export default function NewQuestionTypePage() {
         }),
       )
     })
-  }, [editId, searchParams])
+  }, [editId, modeParam])
 
   useEffect(() => {
     if (mode !== 'my_agent' || !taskState?.taskId || taskState.status !== 'waiting') {
