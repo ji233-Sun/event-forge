@@ -19,10 +19,13 @@ const surveyDateFormatter = new Intl.DateTimeFormat('en-US', {
 
 export default async function SurveyDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ surveyId: string }>
+  searchParams: Promise<{ tab?: string }>
 }) {
   const { surveyId } = await params
+  const { tab } = await searchParams
   const data = await getSurveyDetail(surveyId)
 
   if (!data) notFound()
@@ -54,7 +57,7 @@ export default async function SurveyDetailPage({
           )}
         </div>
 
-        <Tabs defaultValue="overview">
+        <Tabs defaultValue={tab === 'responses' ? 'responses' : 'overview'}>
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="responses">
@@ -120,6 +123,7 @@ export default async function SurveyDetailPage({
 
           <TabsContent value="responses" className="mt-6">
             <ResponsesTable
+              surveyId={surveyId}
               questions={data.questions}
               responses={data.responses}
             />
