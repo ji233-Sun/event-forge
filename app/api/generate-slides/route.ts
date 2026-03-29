@@ -6,17 +6,17 @@ import { DEFAULT_TEMPLATE_VALUES, TEMPLATE_OPTIONS, type TemplateValues } from "
 import { headers } from "next/headers";
 
 function extractMarkdown(text: string): string {
-  // Try to extract from a fenced code block first
-  const mdCodeBlockMatch = text.match(/```(?:markdown|md)?\s*\n?([\s\S]*?)\n?```/i);
-  if (mdCodeBlockMatch) {
-    return mdCodeBlockMatch[1].trim();
-  }
-
   const trimmed = text.trim();
 
   // If the text starts with a heading or list marker, it's likely direct markdown
   if (/^#{1,6}\s/m.test(trimmed) || /^[-*]\s/m.test(trimmed)) {
     return trimmed;
+  }
+
+  // Try to extract from a fenced code block with markdown/md language tag
+  const mdCodeBlockMatch = trimmed.match(/```(?:markdown|md)\s*\n?([\s\S]*?)\n?```/i);
+  if (mdCodeBlockMatch) {
+    return mdCodeBlockMatch[1].trim();
   }
 
   // Strip any leading preamble (text before the first # heading)
@@ -53,7 +53,7 @@ function isValidTemplateValues(v: unknown): v is TemplateValues {
   );
 }
 
-function buildBaseSystemPrompt(language: string, palette: Palette): string {
+function buildBaseSystemPrompt(language: string, palette: Palette, slideCount: number): string {
   const normalizedLanguage = language.trim() || "English";
   const isChinese = isChineseLanguage(normalizedLanguage);
   const label = isChinese ? "中文" : normalizedLanguage;
@@ -76,92 +76,116 @@ function buildBaseSystemPrompt(language: string, palette: Palette): string {
     ? ["第1周", "第2周", "第3周", "第4周", "第5周", "第6周"]
     : ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6"];
 
-  return `You are a top-tier presentation designer and information-visualization specialist. Generate a pure Markdown slide deck.
+  const BT = "`";
+  const tripleBT = BT + BT + BT;
 
-Required:
-- Output pure Markdown only. No explanation or extra wrapper text.
-- All slide copy must be written in ${label}.
-- Separate each slide with ---.
-- Do NOT output raw HTML tags. Use standard Markdown syntax only.
-- Do NOT include any YAML front-matter block (no --- YAML header).
+  const chartExample = JSON.stringify({
+    color: [palette.primary, palette.secondary, palette.accent, palette.slideMuted, palette.slideText],
+    backgroundColor: "transparent",
+    tooltip: {},
+    grid: { top: 40, bottom: 30, left: 60, right: 20 },
+    xAxis: {
+      type: "category",
+      data: barCategories,
+      axisLine: { lineStyle: { color: palette.slideMuted } },
+      axisLabel: { color: palette.slideMuted },
+    },
+    yAxis: {
+      splitLine: { lineStyle: { color: "rgba(128,128,128,0.2)" } },
+      axisLabel: { color: palette.slideMuted },
+    },
+    series: [{ type: "bar", data: [15, 20, 10, 25, 8], barWidth: "40%", animationDuration: 1200, animationEasing: "cubicInOut" }],
+  });
 
-ECharts color values — use these EXACT hex literals in every chart:
-- Primary: ${palette.primary}
-- Secondary: ${palette.secondary}
-- Accent: ${palette.accent}
-- Muted text: ${palette.slideMuted}
-- Main text: ${palette.slideText}
-
-Slide structure:
-- Include at least a cover, agenda, multiple content slides, and a closing slide.
-- Generate exactly 4 slides.- Keep each slide focused on no more than 3 core points.
-- Use at least 3 distinct layouts (cover, comparison, KPI cards, timeline, process list, etc.).
-- Do not use plain bullet-list slides twice in a row.
-
-Emphasis rules:
-- Use **...** for emphasis in Markdown text.
-
-Overflow rules for a 1280×720 canvas:
-- Keep the total visible lines per slide at or under 12.
-- ${itemLengthRule}
-- Chart slides should use one short supporting sentence plus one chart.
-- Keep each column under 6 lines in two-column layouts.
-- Use at most 3 KPI cards in one row.
-- Split content across more slides instead of cramming.
-- ${coverRule}
-
-Copy rules:
-- All slide copy must be written in ${label}.
-- ${unitsRule}
-- Keep the writing concise and presentation-ready.
-
-Visual direction:
-- Use emphasis, horizontal rules (---), and code blocks for visual separation.
-- Leave enough whitespace so each slide has a clear focal point.
-
-ECharts rules:
-- Use exactly 1 slide with an ECharts bar chart.
-- Embed as a fenced code block with language \`echarts\` containing valid JSON.
-- Set axisLine.lineStyle.color and axisLabel.color to your muted text hex color.
-- Use "splitLine":{"lineStyle":{"color":"rgba(128,128,128,0.2)"}}.
-- Use "animationDuration":1200 and "animationEasing":"cubicInOut".
-- Preferred chart types: bar, line with areaStyle, pie with donut radius.
-- Put chart titles in ## heading above the chart, not inside the option JSON.
-
-Bar chart example:
-\`\`\`echarts
-{"color":["${palette.primary}","${palette.secondary}","${palette.accent}","${palette.slideMuted}","${palette.slideText}"],"backgroundColor":"transparent","tooltip":{},"grid":{"top":40,"bottom":30,"left":60,"right":20},"xAxis":{"type":"category","data":${JSON.stringify(barCategories)},"axisLine":{"lineStyle":{"color":"${palette.slideMuted}"}},"axisLabel":{"color":"${palette.slideMuted}"}},"yAxis":{"splitLine":{"lineStyle":{"color":"rgba(128,128,128,0.2)"}},"axisLabel":{"color":"${palette.slideMuted}"}},"series":[{"type":"bar","data":[15,20,10,25,8],"barWidth":"40%","animationDuration":1200,"animationEasing":"cubicInOut"}]}
-\`\`\`
-
-Donut chart example:
-\`\`\`echarts
-{"color":["${palette.primary}","${palette.secondary}","${palette.accent}","${palette.slideMuted}"],"backgroundColor":"transparent","tooltip":{"trigger":"item"},"legend":{"bottom":10,"textStyle":{"color":"${palette.slideMuted}"}},"series":[{"type":"pie","radius":["40%","70%"],"center":["50%","45%"],"data":[{"value":30,"name":"${pieCategories[0]}"},{"value":25,"name":"${pieCategories[1]}"},{"value":20,"name":"${pieCategories[2]}"},{"value":25,"name":"${pieCategories[3]}"}],"label":{"color":"${palette.slideText}"},"animationDuration":1200,"animationEasing":"cubicInOut"}]}
-\`\`\`
-
-Line chart example:
-\`\`\`echarts
-{"color":["${palette.primary}","${palette.secondary}","${palette.accent}"],"backgroundColor":"transparent","tooltip":{"trigger":"axis"},"grid":{"top":40,"bottom":30,"left":60,"right":20},"xAxis":{"type":"category","data":${JSON.stringify(weekLabels)},"axisLine":{"lineStyle":{"color":"${palette.slideMuted}"}},"axisLabel":{"color":"${palette.slideMuted}"}},"yAxis":{"splitLine":{"lineStyle":{"color":"rgba(128,128,128,0.2)"}},"axisLabel":{"color":"${palette.slideMuted}"}},"series":[{"type":"line","smooth":true,"areaStyle":{"opacity":0.15},"data":[50,120,200,350,500,800],"animationDuration":1200,"animationEasing":"cubicInOut"}]}
-\`\`\``;
+  return [
+    "You are a top-tier presentation designer and information-visualization specialist. Generate a pure Markdown slide deck.",
+    "",
+    "Required:",
+    "- Output pure Markdown only. No explanation or extra wrapper text.",
+    "- Do NOT wrap your entire output in a code block. Output raw Markdown directly.",
+    "- All slide copy must be written in " + label + ".",
+    "- Separate each slide with ---.",
+    "- Do NOT output raw HTML tags. Use standard Markdown syntax only.",
+    "- Do NOT include any YAML front-matter block (no --- YAML header).",
+    "",
+    "ECharts color values - use these EXACT hex literals in every chart:",
+    "- Primary: " + palette.primary,
+    "- Secondary: " + palette.secondary,
+    "- Accent: " + palette.accent,
+    "- Muted text: " + palette.slideMuted,
+    "- Main text: " + palette.slideText,
+    "",
+    "Slide structure:",
+    "- Include at least a cover, agenda, multiple content slides, and a closing slide.",
+    "- Generate exactly " + slideCount + " slides. Keep each slide focused on no more than 3 core points.",
+    "- Use at least 3 distinct layouts (cover, comparison, KPI cards, timeline, process list, etc.).",
+    "- Do not use plain bullet-list slides twice in a row.",
+    "",
+    "Emphasis rules:",
+    "- Use **...** for emphasis in Markdown text.",
+    "",
+    "Overflow rules for a 1280x720 canvas:",
+    "- Keep the total visible lines per slide at or under 12.",
+    "- " + itemLengthRule,
+    "- Chart slides should use one short supporting sentence plus one chart.",
+    "- Keep each column under 6 lines in two-column layouts.",
+    "- Use at most 3 KPI cards in one row.",
+    "- Split content across more slides instead of cramming.",
+    "- " + coverRule,
+    "",
+    "Copy rules:",
+    "- All slide copy must be written in " + label + ".",
+    "- " + unitsRule,
+    "- Keep the writing concise and presentation-ready.",
+    "",
+    "Visual direction:",
+    "- Use emphasis, horizontal rules (---), and code blocks for visual separation.",
+    "- Leave enough whitespace so each slide has a clear focal point.",
+    "",
+    "ECharts rules:",
+    "- Use exactly 1 slide with an ECharts bar chart.",
+    "- Embed as a fenced code block with language " + BT + "echarts" + BT + " containing valid JSON.",
+    '- Set axisLine.lineStyle.color and axisLabel.color to your muted text hex color.',
+    '- Use "splitLine":{"lineStyle":{"color":"rgba(128,128,128,0.2)"}}.',
+    '- Use "animationDuration":1200 and "animationEasing":"cubicInOut".',
+    "- Preferred chart types: bar, line with areaStyle, pie with donut radius.",
+    "- Put chart titles in ## heading above the chart, not inside the option JSON.",
+    "",
+    "Bar chart EXAMPLE (do NOT copy verbatim, create your own data):",
+    tripleBT + "echarts",
+    chartExample,
+    tripleBT,
+    "",
+    "Now generate the slide deck based on the user's event description. Start directly with the first slide heading.",
+  ].join("\n");
 }
 
-function buildRetryConstraint(language: string): string {
+function buildRetryConstraint(language: string, slideCount: number): string {
+  const minSeparators = slideCount - 1;
   if (isChineseLanguage(language)) {
-    return `硬性要求： output at least 4 slides.
- Include at least 3 slide separators (---).
- If the source material is thin, add an agenda, content, and closing slide.`;  return `Hard requirement: output at least 4 slides.
-- Include at least 3 slide separators (---).
-- Never return a single-slide deck.- If the source material is thin, add an agenda, approach, budget, timeline, and closing slide.`;
+    return [
+      "Hard requirement: output at least " + slideCount + " slides.",
+      "- Include at least " + minSeparators + " slide separators (---).",
+      "- If the source material is thin, add an agenda, content, and closing slide.",
+    ].join("\n");
+  }
+  return [
+    "Hard requirement: output at least " + slideCount + " slides.",
+    "- Include at least " + minSeparators + " slide separators (---).",
+    "- Never return a single-slide deck.",
+    "- If the source material is thin, add an agenda, approach, budget, timeline, and closing slide.",
+  ].join("\n");
 }
-
 async function generateMarkdown(
   prompt: string,
   language: string,
   palette: Palette,
+  slideCount: number,
   extraConstraint?: string,
 ): Promise<{ text: string; finishReason: string }> {
   const { text, finishReason } = await generate("medium", prompt, {
     maxOutputTokens: 10000,
-    system: [buildBaseSystemPrompt(language, palette), extraConstraint].filter(Boolean).join("\n\n"),
+    system: [buildBaseSystemPrompt(language, palette, slideCount), extraConstraint].filter(Boolean).join("\n\n"),
   });
 
   return {
@@ -187,10 +211,11 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { prompt, language, templateValues } = body as {
+  const { prompt, language, templateValues, slideCount: rawSlideCount } = body as {
     prompt?: string;
     language?: string;
     templateValues?: unknown;
+    slideCount?: unknown;
   };
 
   if (typeof prompt !== "string" || prompt.trim() === "") {
@@ -200,18 +225,25 @@ export async function POST(req: Request) {
   const outputLanguage =
     typeof language === "string" && language.trim() ? language.trim() : "English";
   const trimmedPrompt = prompt.trim();
-  const basePrompt = `Create a Markdown slide deck in ${outputLanguage} based on the following event description:\n\n${trimmedPrompt}`;
+  const basePrompt = `Create a Markdown slide deck in ${outputLanguage} based on the following event description:
+
+${trimmedPrompt}`;
 
   const resolvedValues: TemplateValues = isValidTemplateValues(templateValues)
     ? templateValues
     : DEFAULT_TEMPLATE_VALUES;
   const palette = resolvePalette(resolvedValues);
 
+  // Clamp slide count to [4, 16], default 8
+  const requestedSlideCount = typeof rawSlideCount === "number" && Number.isInteger(rawSlideCount)
+    ? Math.max(4, Math.min(16, rawSlideCount))
+    : 8;
+
   let markdown: string;
   let slideCount: number;
 
   try {
-    const { text, finishReason } = await generateMarkdown(basePrompt, outputLanguage, palette);
+    const { text, finishReason } = await generateMarkdown(basePrompt, outputLanguage, palette, requestedSlideCount);
 
     if (finishReason === "length") {
       return Response.json(
@@ -225,17 +257,18 @@ export async function POST(req: Request) {
 
     markdown = extractMarkdown(text);
     slideCount = countSlides(markdown);
-    console.log("[generate-slides] first attempt slide count:", slideCount, "markdown length:", markdown.length);
-    if (slideCount < 4) {
+    console.log("[generate-slides] first attempt slide count:", slideCount, "requested:", requestedSlideCount, "markdown length:", markdown.length);
+    if (slideCount < requestedSlideCount) {
       console.log("[generate-slides] first 200 chars:", markdown.substring(0, 200));
     }
 
-    if (slideCount < 4) {
+    if (slideCount < requestedSlideCount) {
       const retry = await generateMarkdown(
         basePrompt,
         outputLanguage,
         palette,
-        buildRetryConstraint(outputLanguage),
+        requestedSlideCount,
+        buildRetryConstraint(outputLanguage, requestedSlideCount),
       );
 
       if (retry.finishReason === "length") {
@@ -270,7 +303,7 @@ export async function POST(req: Request) {
     return Response.json(
       {
         error:
-          | Failed to generate a 4-slide minimum deck. Please retry with more detailed event information.",
+          `Failed to generate the requested ${requestedSlideCount}-slide deck (got ${slideCount}). Please retry with more detailed event information.`,
       },
       { status: 502 },
     );

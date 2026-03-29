@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { SlidePreview, type SlidePreviewHandle } from '@/components/slide-preview'
+import { SlideRenderer } from '@/components/slides/SlideRenderer'
 import { ThumbnailStrip } from '@/components/slide-studio/thumbnail-strip'
 import { EditPanel } from '@/components/slide-studio/edit-panel'
 import { StylePanel } from '@/components/slide-studio/style-panel'
@@ -19,6 +20,7 @@ import type { DeckSummary, SlideMode, ImageSlide } from './actions'
 import { ImageGeneratingScreen } from '@/components/slide-studio/image-generating-screen'
 import { ImageStudioView } from '@/components/slide-studio/image-studio-view'
 import { StylePickerScreen } from '@/components/slide-studio/style-picker-screen'
+import { SlidesGeneratingScreen } from '@/components/slide-studio/slides-generating-screen'
 import type { ImageSlideState } from '@/components/slide-studio/image-types'
 import {
   createInitialTemplateStoreState,
@@ -37,6 +39,7 @@ import {
   IconPresentation,
   IconTrash,
   IconClock,
+  IconFileTypePdf,
 } from '@tabler/icons-react'
 
 type Phase = 'input' | 'style-pick' | 'generating' | 'studio' | 'image-generating' | 'image-studio'
@@ -67,6 +70,9 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
 
   const [editLoading, setEditLoading] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const [exportCaptureIndex, setExportCaptureIndex] = useState(0)
 
   const [templateState, setTemplateState] = useState<TemplateStoreState>(
     () => createInitialTemplateStoreState()
@@ -82,8 +88,11 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const [imageSlideStates, setImageSlideStates] = useState<ImageSlideState[]>([])
   const [imageGenerateError, setImageGenerateError] = useState<string | null>(null)
   const [imageDeckTitle, setImageDeckTitle] = useState<string>('Slide Deck')
+  const [slideCount, setSlideCount] = useState(8)
 
   const previewRef = useRef<SlidePreviewHandle>(null)
+  const exportSlideRef = useRef<HTMLDivElement>(null)
+  const slides = useMemo(() => (markdown ? parseSlides(markdown) : []), [markdown])
 
   // ── Generate ──────────────────────────────────────────────────────────
   async function handleGenerate() {
@@ -95,7 +104,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       const res = await fetch('/api/generate-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, templateValues: getTemplateValues(templateState) }),
+        body: JSON.stringify({ prompt, templateValues: getTemplateValues(templateState), slideCount }),
       })
 
       if (!res.ok) {
@@ -287,6 +296,73 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     setTemplateState((prev) => shuffleTemplateState(prev))
   }, [])
 
+  const handleDownloadPdf = useCallback(async () => {
+    if (slides.length === 0 || isExportingPdf) return
+
+    setExportError(null)
+    setIsExportingPdf(true)
+
+    try {
+      const { toPng } = await import('html-to-image')
+      const { PDFDocument } = await import('pdf-lib')
+
+      const doc = await PDFDocument.create()
+      const title = getSlideTitle(slides[0], 'slide-deck')
+      doc.setTitle(title)
+
+      // Wait for async font loading to avoid text jumps between pages.
+      if ('fonts' in document) {
+        await document.fonts.ready
+      }
+
+      // 16:9 in points (1 pt = 1/72 inch; 13.33" × 7.5" = 960 × 540 pt)
+      const W = 960
+      const H = 540
+
+      for (let i = 0; i < slides.length; i += 1) {
+        setExportCaptureIndex(i)
+
+        // Give charts and markdown layout a moment to settle before capture.
+        await new Promise((resolve) => setTimeout(resolve, 120))
+
+        const target = exportSlideRef.current
+        if (!target) continue
+
+        const pngDataUrl = await toPng(target, {
+          cacheBust: true,
+          pixelRatio: 2,
+          width: 1280,
+          height: 720,
+          backgroundColor: '#000000',
+        })
+
+        const pngBytes = await fetch(pngDataUrl).then((res) => res.arrayBuffer())
+        const image = await doc.embedPng(pngBytes)
+        const page = doc.addPage([W, H])
+        page.drawImage(image, { x: 0, y: 0, width: W, height: H })
+      }
+
+      const pdfBytes = await doc.save()
+      const pdfArrayBuffer = new ArrayBuffer(pdfBytes.byteLength)
+      new Uint8Array(pdfArrayBuffer).set(pdfBytes)
+      const safeTitle = title.replace(/[\\/:*?"<>|\r\n]/g, '-').trim() || 'slide-deck'
+      const blob = new Blob([pdfArrayBuffer], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${safeTitle}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Failed to export PDF')
+    } finally {
+      setIsExportingPdf(false)
+      setExportCaptureIndex(0)
+    }
+  }, [slides, isExportingPdf])
+
   // Shared restyle helper: replaces ECharts colors, updates markdown + DB
   const handleRestyle = useCallback(async (prevValues: TemplateValues, newValues: TemplateValues) => {
     if (!markdown) return
@@ -398,6 +474,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     setLoadingDeckId(id)
     setGenerateError(null)
     setImageGenerateError(null)
+    setExportError(null)
     try {
       const d = await getDeck(id)
 
@@ -447,7 +524,6 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
 
   // ── Derived state ─────────────────────────────────────────────────────
   const currentTemplateValues = getTemplateValues(templateState)
-  const slides = markdown ? parseSlides(markdown) : []
   const titles = slides.map((seg, i) => getSlideTitle(seg, `Slide ${i + 1}`))
 
   // ── Render: Style Pick ────────────────────────────────────────────────
@@ -470,13 +546,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
 
   // ── Render: Generating ────────────────────────────────────────────────
   if (phase === 'generating') {
-    return (
-      <div className="flex h-[calc(100vh-3rem)] flex-col items-center justify-center gap-4">
-        <IconLoader2 className="size-10 animate-spin text-muted-foreground" />
-        <p className="text-lg font-medium">Crafting your slides...</p>
-        <p className="text-sm text-muted-foreground">This usually takes 15-30 seconds</p>
-      </div>
-    )
+    return <SlidesGeneratingScreen />
   }
 
   // ── Render: Image Generating ──────────────────────────────────────────
@@ -529,12 +599,31 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           <h1 className="text-sm font-semibold">Slide Studio</h1>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{slides.length} slides</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadPdf}
+              disabled={slides.length === 0 || isExportingPdf}
+            >
+              {isExportingPdf ? (
+                <IconLoader2 className="mr-1 size-4 animate-spin" />
+              ) : (
+                <IconFileTypePdf className="mr-1 size-4" />
+              )}
+              {isExportingPdf ? 'Exporting PDF...' : 'Download PDF'}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => previewRef.current?.present()}>
               <IconPresentation className="mr-1 size-4" />
               Present
             </Button>
           </div>
         </header>
+
+        {exportError && (
+          <div className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+            {exportError}
+          </div>
+        )}
 
         <div className="flex flex-1 overflow-hidden">
           <aside className="w-40 shrink-0 overflow-y-auto border-r">
@@ -608,6 +697,18 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             </div>
           </aside>
         </div>
+
+        {/* Offscreen slide canvas used only for PDF capture */}
+        {slides.length > 0 && (
+          <div className="pointer-events-none fixed -left-[200vw] top-0 h-[720px] w-[1280px] opacity-0" aria-hidden>
+            <div ref={exportSlideRef} className="h-full w-full">
+              <SlideRenderer
+                content={slides[exportCaptureIndex] ?? ''}
+                templateValues={currentTemplateValues}
+              />
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -644,6 +745,30 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
+          {/* Slide count selector — Markdown mode only */}
+          {slideMode === 'marp' && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Pages:</span>
+            <button
+              type="button"
+              className="flex size-7 items-center justify-center rounded-md border border-input text-sm hover:bg-muted disabled:opacity-40"
+              disabled={slideCount <= 4}
+              onClick={() => setSlideCount((n) => Math.max(4, n - 1))}
+            >
+              -
+            </button>
+            <span className="w-6 text-center text-sm font-medium">{slideCount}</span>
+            <button
+              type="button"
+              className="flex size-7 items-center justify-center rounded-md border border-input text-sm hover:bg-muted disabled:opacity-40"
+              disabled={slideCount >= 16}
+              onClick={() => setSlideCount((n) => Math.min(16, n + 1))}
+            >
+              +
+            </button>
+          </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={slideMode === 'marp' ? () => setPhase('style-pick') : handleGenerateImages}

@@ -9,6 +9,8 @@ interface SlideDeckPreviewProps {
   values: TemplateValues;
 }
 
+const PREVIEW_SCALE = "h-[161.3%] w-[161.3%] origin-top-left scale-[0.62]";
+
 export const SlideDeckPreview = memo(function SlideDeckPreview({ values }: SlideDeckPreviewProps) {
   const markdown = generateSampleMarkdown(values);
 
@@ -27,11 +29,11 @@ export const SlideDeckPreview = memo(function SlideDeckPreview({ values }: Slide
   const previewSlides = slides.slice(0, 4);
 
   return (
-    <div className="h-full w-full">
-      <div className="grid h-full w-full grid-cols-2 grid-rows-2 gap-1.5">
+    <div className="flex h-full w-full items-center justify-center p-4 md:p-6">
+      <div className="grid aspect-video w-full max-h-full max-w-full grid-cols-2 grid-rows-2 gap-2">
         {previewSlides.map((slide, i) => (
-          <div key={i} className="flex items-center justify-center overflow-hidden">
-            <div className="aspect-video h-full max-h-full w-full">
+          <div key={i} className="aspect-video overflow-hidden rounded-sm border border-border/30 bg-black/80">
+            <div className={`pointer-events-none ${PREVIEW_SCALE}`}>
               <SlideRenderer content={slide} templateValues={values} />
             </div>
           </div>
@@ -40,7 +42,7 @@ export const SlideDeckPreview = memo(function SlideDeckPreview({ values }: Slide
         {Array.from({ length: Math.max(0, 4 - previewSlides.length) }).map((_, i) => (
           <div
             key={`empty-${i}`}
-            className="flex items-center justify-center text-xs text-muted-foreground"
+            className="aspect-video rounded-sm border border-border/30 bg-muted/20 text-xs text-muted-foreground"
           />
         ))}
       </div>
