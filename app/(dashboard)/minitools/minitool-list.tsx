@@ -113,13 +113,17 @@ export function MinitoolList({ initialTools }: { initialTools: MinitoolItem[] })
                   variant="ghost"
                   size="icon"
                   className="h-7 w-7"
-                  asChild
+                  asChild={tool.isPublic}
                   disabled={!tool.isPublic}
                   title="Open public page"
                 >
-                  <Link href={`/t/${tool.id}`} target="_blank">
+                  {tool.isPublic ? (
+                    <Link href={`/t/${tool.id}`} target="_blank">
+                      <IconExternalLink size={14} />
+                    </Link>
+                  ) : (
                     <IconExternalLink size={14} />
-                  </Link>
+                  )}
                 </Button>
                 <Button
                   variant="ghost"
