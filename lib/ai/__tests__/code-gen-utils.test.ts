@@ -33,6 +33,11 @@ describe('extractJson', () => {
   it('throws on empty string', () => {
     expect(() => extractJson('')).toThrow('No JSON object found in response.')
   })
+
+  it('correctly handles text after JSON that contains }', () => {
+    const raw = 'Result: {"a":1}. Also consider {"b":2} if needed.'
+    expect(JSON.parse(extractJson(raw))).toEqual({ a: 1 })
+  })
 })
 
 describe('hasTypeScript', () => {
@@ -82,6 +87,33 @@ describe('hasTypeScript', () => {
             <Button onClick={() => setVal('')}>Clear</Button>
           </div>
         )
+      }
+      render(<Component />)
+    `
+    expect(hasTypeScript(code)).toBe(false)
+  })
+
+  it('does NOT false-positive on object props with lowercase values', () => {
+    expect(hasTypeScript('style={{ color: red, fontSize: large }}')).toBe(false)
+  })
+
+  it('detects TS primitive type annotation', () => {
+    expect(hasTypeScript('function f(x: string) {}')).toBe(true)
+  })
+
+  it('detects single-identifier generic like useState<string>', () => {
+    expect(hasTypeScript('useState<string>([])')).toBe(true)
+  })
+
+  it('detects useRef<HTMLDivElement>', () => {
+    expect(hasTypeScript('useRef<HTMLDivElement>(null)')).toBe(true)
+  })
+
+  it('does NOT match plain JSX with style and event props', () => {
+    const code = `
+      function Component() {
+        const [color, setColor] = useState('red')
+        return <div style={{ color: color, gap: 4 }}><Button onClick={() => setColor('blue')}>Go</Button></div>
       }
       render(<Component />)
     `
