@@ -1,10 +1,11 @@
 import { generateText } from 'ai'
 import { getModel } from '@/lib/ai'
+import type { GenerateCustomTypeResult } from '@/lib/question-runtime/types'
 import { extractJson, hasTypeScript } from '@/lib/ai/code-gen-utils'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 
-const SYSTEM_PROMPT = `OUTPUT DISCIPLINE — MANDATORY:
+export const SYSTEM_PROMPT = `OUTPUT DISCIPLINE — MANDATORY:
 Return ONLY the raw JSON object. No markdown, no code fences, no explanation text,
 no preamble, no postamble. The very first character must be \`{\`. The very last must be \`}\`.
 
@@ -195,6 +196,26 @@ Requirements:
 - Button sizing: size="lg" for the primary CTA, size="sm" for secondary actions
 - No emoji anywhere — use Tabler icons instead`
 
+export function parseGeneratedCustomTypeResult(text: string): GenerateCustomTypeResult {
+  const withoutThinking = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  const parsed = JSON.parse(extractJson(withoutThinking))
+
+  if (!parsed.formCode || !parsed.displayCode || !parsed.answerSchema || !parsed.suggestedName) {
+    throw new Error('AI returned incomplete output.')
+  }
+
+  const codeFields = [parsed.formCode, parsed.displayCode].filter(
+    (field): field is string => typeof field === 'string',
+  )
+  for (const field of codeFields) {
+    if (hasTypeScript(field)) {
+      throw new Error('Generated code contains TypeScript syntax not supported by the sandbox.')
+    }
+  }
+
+  return parsed as GenerateCustomTypeResult
+}
+
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session?.user) {
@@ -224,24 +245,7 @@ export async function POST(request: Request) {
       system: SYSTEM_PROMPT,
       prompt: `Create a custom survey question type for: ${prompt.trim()}`,
     })
-
-    const withoutThinking = result.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
-    const parsed = JSON.parse(extractJson(withoutThinking))
-
-    if (!parsed.formCode || !parsed.displayCode || !parsed.answerSchema || !parsed.suggestedName) {
-      throw new Error('AI returned incomplete output.')
-    }
-
-    const codeFields = [parsed.formCode, parsed.displayCode].filter(
-      (f): f is string => typeof f === 'string',
-    )
-    for (const field of codeFields) {
-      if (hasTypeScript(field)) {
-        throw new Error('Generated code contains TypeScript syntax not supported by the sandbox.')
-      }
-    }
-
-    return Response.json(parsed)
+    return Response.json(parseGeneratedCustomTypeResult(result.text))
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Generation failed.'
     return Response.json({ error: message }, { status: 500 })

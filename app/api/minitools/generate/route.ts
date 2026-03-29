@@ -4,8 +4,9 @@ import { assertMinimaxApiKey } from '@/lib/ai/provider'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
 import { extractJson, hasTypeScript } from '@/lib/ai/code-gen-utils'
+import type { GenerateMinitoolResult } from '@/lib/minitool-runtime/types'
 
-const SYSTEM_PROMPT = `OUTPUT DISCIPLINE — MANDATORY:
+export const SYSTEM_PROMPT = `OUTPUT DISCIPLINE — MANDATORY:
 Return ONLY the raw JSON object. No markdown, no code fences, no explanation text,
 no preamble, no postamble. The very first character must be \`{\`. The very last must be \`}\`.
 
@@ -238,6 +239,26 @@ Requirements:
 - Button sizing: size="lg" for the primary CTA, size="sm" for secondary actions
 - No emoji anywhere — use Tabler icons instead`
 
+export function parseGeneratedMinitoolResult(text: string): GenerateMinitoolResult {
+  const withoutThinking = text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  const parsed = JSON.parse(extractJson(withoutThinking)) as Record<string, unknown>
+
+  if (!parsed.componentCode || !parsed.hostCode || !parsed.suggestedName) {
+    throw new Error('AI returned incomplete output.')
+  }
+
+  const codeFields = [parsed.componentCode, parsed.hostCode].filter(
+    (field): field is string => typeof field === 'string',
+  )
+  for (const field of codeFields) {
+    if (hasTypeScript(field)) {
+      throw new Error('Generated code contains TypeScript syntax not supported by the sandbox.')
+    }
+  }
+
+  return parsed as GenerateMinitoolResult
+}
+
 export async function POST(request: Request) {
   assertMinimaxApiKey()
 
@@ -269,24 +290,7 @@ export async function POST(request: Request) {
       system: SYSTEM_PROMPT,
       prompt: `Create a live event minitool for: ${prompt.trim()}`,
     })
-
-    const withoutThinking = result.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
-    const parsed = JSON.parse(extractJson(withoutThinking)) as Record<string, unknown>
-
-    if (!parsed.componentCode || !parsed.hostCode || !parsed.suggestedName) {
-      throw new Error('AI returned incomplete output.')
-    }
-
-    const codeFields = [parsed.componentCode, parsed.hostCode].filter(
-      (f): f is string => typeof f === 'string',
-    )
-    for (const field of codeFields) {
-      if (hasTypeScript(field)) {
-        throw new Error('Generated code contains TypeScript syntax not supported by the sandbox.')
-      }
-    }
-
-    return Response.json(parsed)
+    return Response.json(parseGeneratedMinitoolResult(result.text))
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Generation failed.'
     return Response.json({ error: message }, { status: 500 })

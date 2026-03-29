@@ -32,12 +32,15 @@ export default function NewQuestionTypePage() {
 
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isIterating, setIsIterating] = useState(false)
   const [result, setResult] = useState<GenerateCustomTypeResult | null>(null)
+  const [iterationFeedback, setIterationFeedback] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [previewValue, setPreviewValue] = useState<unknown>(undefined)
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
+  const isPromptLocked = !!result || !!editId
 
   // Load existing type if editing/viewing
   useEffect(() => {
@@ -49,7 +52,7 @@ export default function NewQuestionTypePage() {
           setResult({
             formCode: type.formCode,
             displayCode: type.displayCode,
-            answerSchema: type.answerSchema as any,
+            answerSchema: type.answerSchema as GenerateCustomTypeResult['answerSchema'],
             suggestedName: type.name,
           })
         }
@@ -79,6 +82,33 @@ export default function NewQuestionTypePage() {
       setError(e instanceof Error ? e.message : 'Generation failed.')
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  async function handleIterate() {
+    if (!result || !iterationFeedback.trim()) return
+    setIsIterating(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/question-types/iterate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originalPrompt: prompt,
+          feedback: iterationFeedback,
+          currentResult: result,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setResult(data as GenerateCustomTypeResult)
+      setName(data.suggestedName)
+      setIterationFeedback('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Iteration failed.')
+    } finally {
+      setIsIterating(false)
     }
   }
 
@@ -116,12 +146,12 @@ export default function NewQuestionTypePage() {
                 {editId ? 'Question Type Details' : 'Create Question Type'}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {editId ? 'View or refine your custom question type.' : 'Describe your vision, AI handles the rest.'}
+                {editId ? 'View your saved custom question type.' : 'Describe your vision, AI handles the rest.'}
               </p>
             </div>
           </div>
           {result && !editId && (
-            <Button onClick={handleSave} disabled={!name.trim() || isSaving} className="h-10 px-6">
+            <Button onClick={handleSave} disabled={!name.trim() || isSaving || isIterating} className="h-10 px-6">
               {isSaving ? (
                 <>
                   <IconLoader2 size={18} className="mr-2 animate-spin" />
@@ -158,14 +188,20 @@ export default function NewQuestionTypePage() {
                       placeholder="e.g. A visual slider for rating energy levels with a comment box..."
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
-                      readOnly={!!editId}
+                      readOnly={isPromptLocked}
                       className={cn(
                         "min-h-[160px] resize-none border-border/60 bg-background focus:ring-primary/20",
-                        editId && "bg-muted/50"
+                        isPromptLocked && "bg-muted/50"
                       )}
                     />
                   </div>
-                  {!editId && (
+                  {isPromptLocked ? (
+                    <p className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      {editId
+                        ? 'The original prompt is read-only in the saved details view.'
+                        : 'The initial prompt is locked after generation. Use iteration feedback below to request bug fixes or improvements based on the current result.'}
+                    </p>
+                  ) : (
                     <Button 
                       onClick={handleGenerate} 
                       disabled={!prompt.trim() || isGenerating}
@@ -194,11 +230,57 @@ export default function NewQuestionTypePage() {
               </CardContent>
             </Card>
 
+            {result && !editId && (
+              <Card className="overflow-hidden border-border/40 shadow-sm transition-shadow hover:shadow-md">
+                <CardHeader className="bg-muted/30 pb-4">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    2. Iterate the Result
+                  </CardTitle>
+                  <CardDescription>
+                    Describe bugs, UX issues, or feature improvements for the generated output.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="iteration-feedback" className="text-sm font-medium">
+                        What should change in the current result?
+                      </Label>
+                      <Textarea
+                        id="iteration-feedback"
+                        placeholder="e.g. Fix the mobile spacing bug, add a clearer success state, and make the comment box optional."
+                        value={iterationFeedback}
+                        onChange={(e) => setIterationFeedback(e.target.value)}
+                        className="min-h-[140px] resize-none border-border/60 bg-background focus:ring-primary/20"
+                      />
+                    </div>
+                    <Button
+                      onClick={handleIterate}
+                      disabled={!iterationFeedback.trim() || isIterating || isSaving}
+                      className="w-full shadow-lg shadow-primary/10 transition-all active:scale-[0.98]"
+                    >
+                      {isIterating ? (
+                        <>
+                          <IconLoader2 size={18} className="mr-2 animate-spin" />
+                          Applying Iteration...
+                        </>
+                      ) : (
+                        <>
+                          <IconWand size={18} className="mr-2" />
+                          Refine Current Result
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {result && (
               <Card className="overflow-hidden border-border/40 shadow-sm transition-shadow hover:shadow-md">
                 <CardHeader className="bg-muted/30 pb-4">
                   <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    2. Identity
+                    {editId ? '2. Identity' : '3. Identity'}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">

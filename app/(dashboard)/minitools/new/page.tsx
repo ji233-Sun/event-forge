@@ -22,6 +22,7 @@ import {
 } from '@tabler/icons-react'
 import { createMinitool } from '../actions'
 import type { GenerateMinitoolResult } from '@/lib/minitool-runtime/types'
+import { cn } from '@/lib/utils'
 
 const MinitoolRenderer = dynamic(
   () => import('@/components/minitool-renderer').then((m) => m.MinitoolRenderer),
@@ -32,11 +33,14 @@ export default function NewMinitoolPage() {
   const router = useRouter()
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
+  const [isIterating, setIsIterating] = useState(false)
   const [result, setResult] = useState<GenerateMinitoolResult | null>(null)
+  const [iterationFeedback, setIterationFeedback] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'audience' | 'host'>('audience')
+  const isPromptLocked = !!result
 
   async function handleGenerate() {
     if (!prompt.trim()) return
@@ -57,6 +61,33 @@ export default function NewMinitoolPage() {
       setError(e instanceof Error ? e.message : 'Generation failed.')
     } finally {
       setIsGenerating(false)
+    }
+  }
+
+  async function handleIterate() {
+    if (!result || !iterationFeedback.trim()) return
+    setIsIterating(true)
+    setError('')
+
+    try {
+      const res = await fetch('/api/minitools/iterate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          originalPrompt: prompt,
+          feedback: iterationFeedback,
+          currentResult: result,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setResult(data as GenerateMinitoolResult)
+      setName(data.suggestedName)
+      setIterationFeedback('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Iteration failed.')
+    } finally {
+      setIsIterating(false)
     }
   }
 
@@ -91,7 +122,7 @@ export default function NewMinitoolPage() {
             </div>
           </div>
           {result && (
-            <Button onClick={handleSave} disabled={!name.trim() || isSaving} className="h-10 px-6">
+            <Button onClick={handleSave} disabled={!name.trim() || isSaving || isIterating} className="h-10 px-6">
               {isSaving ? (
                 <><IconLoader2 size={18} className="mr-2 animate-spin" />Saving...</>
               ) : (
@@ -121,20 +152,30 @@ export default function NewMinitoolPage() {
                     placeholder="e.g. A live emoji reaction wall where audience members pick their mood..."
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    className="min-h-[160px] resize-none border-border/60 bg-background"
+                    readOnly={isPromptLocked}
+                    className={cn(
+                      "min-h-[160px] resize-none border-border/60 bg-background",
+                      isPromptLocked && "bg-muted/50",
+                    )}
                   />
                 </div>
-                <Button
-                  onClick={handleGenerate}
-                  disabled={!prompt.trim() || isGenerating}
-                  className="w-full shadow-lg shadow-primary/10"
-                >
-                  {isGenerating ? (
-                    <><IconLoader2 size={18} className="mr-2 animate-spin" />Generating...</>
-                  ) : (
-                    <><IconWand size={18} className="mr-2" />{result ? 'Regenerate' : 'Generate with AI'}</>
-                  )}
-                </Button>
+                {isPromptLocked ? (
+                  <p className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                    The initial prompt is locked after generation. Use iteration feedback below to request bug fixes or improvements based on the current result.
+                  </p>
+                ) : (
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={!prompt.trim() || isGenerating}
+                    className="w-full shadow-lg shadow-primary/10"
+                  >
+                    {isGenerating ? (
+                      <><IconLoader2 size={18} className="mr-2 animate-spin" />Generating...</>
+                    ) : (
+                      <><IconWand size={18} className="mr-2" />Generate with AI</>
+                    )}
+                  </Button>
+                )}
                 {error && (
                   <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
                     <IconAlertCircle size={14} />{error}
@@ -147,7 +188,42 @@ export default function NewMinitoolPage() {
               <Card className="overflow-hidden border-border/40 shadow-sm">
                 <CardHeader className="bg-muted/30 pb-4">
                   <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    2. Name
+                    2. Iterate the Result
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="iteration-feedback" className="text-sm font-medium">
+                      What should change in the current result?
+                    </Label>
+                    <Textarea
+                      id="iteration-feedback"
+                      placeholder="e.g. Fix the host aggregation bug, improve empty states, and make the audience CTA more obvious."
+                      value={iterationFeedback}
+                      onChange={(e) => setIterationFeedback(e.target.value)}
+                      className="min-h-[140px] resize-none border-border/60 bg-background"
+                    />
+                  </div>
+                  <Button
+                    onClick={handleIterate}
+                    disabled={!iterationFeedback.trim() || isIterating || isSaving}
+                    className="w-full shadow-lg shadow-primary/10"
+                  >
+                    {isIterating ? (
+                      <><IconLoader2 size={18} className="mr-2 animate-spin" />Applying Iteration...</>
+                    ) : (
+                      <><IconWand size={18} className="mr-2" />Refine Current Result</>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {result && (
+              <Card className="overflow-hidden border-border/40 shadow-sm">
+                <CardHeader className="bg-muted/30 pb-4">
+                  <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    3. Name
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
