@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
+import { ShareLinkDialogButton } from '@/components/share-link-dialog-button'
 import {
   IconTrash,
-  IconExternalLink,
   IconCopy,
   IconUsers,
   IconTool,
@@ -109,22 +109,17 @@ export function MinitoolList({ initialTools }: { initialTools: MinitoolItem[] })
                 >
                   <IconCopy size={14} />
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  asChild={tool.isPublic}
+                <ShareLinkDialogButton
+                  url={`/t/${tool.id}`}
                   disabled={!tool.isPublic}
-                  title="Open public page"
-                >
-                  {tool.isPublic ? (
-                    <Link href={`/t/${tool.id}`} target="_blank">
-                      <IconExternalLink size={14} />
-                    </Link>
-                  ) : (
-                    <IconExternalLink size={14} />
-                  )}
-                </Button>
+                  triggerSize="icon"
+                  triggerClassName="h-7 w-7"
+                  iconSize={14}
+                  triggerTitle="Open public page"
+                  triggerAriaLabel="Open public page"
+                  dialogTitle="Share Minitool"
+                  dialogDescription="Scan the QR code or copy this public link to share your minitool."
+                />
                 <Button
                   variant="ghost"
                   size="icon"

@@ -10,6 +10,7 @@ import {
 import { ResponsesTable } from './components/responses-table'
 import { CopyLinkButton } from './components/copy-link-button'
 import { SurveyActions } from './components/survey-actions'
+import { ShareLinkQRCode } from '@/components/share-link-qrcode'
 
 const surveyDateFormatter = new Intl.DateTimeFormat('en-US', {
   dateStyle: 'medium',
@@ -83,8 +84,9 @@ export default async function SurveyDetailPage({
                     Share this link with people to collect responses
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-4">
                   <CopyLinkButton path={publicUrl} />
+                  <ShareLinkQRCode url={publicUrl} />
                 </CardContent>
               </Card>
             )}

@@ -6,6 +6,7 @@ import { deleteSurvey, publishSurvey, closeSurvey } from './actions'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { ShareLinkDialogButton } from '@/components/share-link-dialog-button'
 import {
   Dialog,
   DialogContent,
@@ -18,7 +19,6 @@ import {
 import {
   IconEdit,
   IconTrash,
-  IconExternalLink,
   IconChartBar,
   IconLoader2,
   IconEye,
@@ -175,17 +175,15 @@ function SurveyCard({ survey: s }: { survey: SurveyWithCounts }) {
                 </Link>
               </Button>
               {s.slug && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  aria-label="Open public link"
-                  title="Open public link"
-                  asChild
-                >
-                  <Link href={`/s/${s.slug}`} target="_blank">
-                    <IconExternalLink size={16} />
-                  </Link>
-                </Button>
+                <ShareLinkDialogButton
+                  url={`/s/${s.slug}`}
+                  triggerSize="icon-sm"
+                  iconSize={16}
+                  triggerTitle="Open public link"
+                  triggerAriaLabel="Open public link"
+                  dialogTitle="Share Survey"
+                  dialogDescription="Scan the QR code or copy this public survey link to share."
+                />
               )}
               <Button variant="outline" size="sm" onClick={handleClose} disabled={loading}>
                 {loading ? <IconLoader2 size={16} className="animate-spin" /> : <IconCircleX size={16} />}

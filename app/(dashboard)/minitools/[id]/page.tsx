@@ -11,6 +11,7 @@ import { getMinitoolById, getMinitoolParticipants } from '../actions'
 import { CopyLinkButton } from './copy-link-button'
 import { MinitoolPublicToggle } from './minitool-public-toggle'
 import { MinitoolRenderer } from './minitool-renderer-client'
+import { ShareLinkQRCode } from '@/components/share-link-qrcode'
 
 export default async function MinitoolDetailPage({
   params,
@@ -18,14 +19,19 @@ export default async function MinitoolDetailPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const session = await auth.api.getSession({ headers: await headers() })
+  const requestHeaders = await headers()
+  const session = await auth.api.getSession({ headers: requestHeaders })
   if (!session?.user) redirect('/login')
 
   const tool = await getMinitoolById(id)
   if (!tool) notFound()
 
   const participants = await getMinitoolParticipants(id)
-  const shareUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/t/${tool.id}`
+  const sharePath = `/t/${tool.id}`
+  const requestHost = requestHeaders.get('x-forwarded-host') ?? requestHeaders.get('host')
+  const requestProtocol = requestHeaders.get('x-forwarded-proto') ?? 'http'
+  const requestOrigin = process.env.NEXT_PUBLIC_APP_URL ?? (requestHost ? `${requestProtocol}://${requestHost}` : '')
+  const shareUrl = `${requestOrigin}${sharePath}`
 
   return (
     <div className="min-h-full bg-background/50">
@@ -62,6 +68,7 @@ export default async function MinitoolDetailPage({
               </Button>
               <MinitoolPublicToggle minitoolId={tool.id} initialIsPublic={tool.isPublic} />
             </div>
+            <ShareLinkQRCode url={shareUrl} size={108} showUrl={false} className="shrink-0" />
           </CardContent>
         </Card>
 
