@@ -1,16 +1,15 @@
 import { getSurveyDetail } from '../actions'
 import { notFound } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
-  IconExternalLink,
   IconUsers,
   IconClipboardList,
 } from '@tabler/icons-react'
 import { ResponsesTable } from './components/responses-table'
 import { CopyLinkButton } from './components/copy-link-button'
+import { SurveyActions } from './components/survey-actions'
 
 const surveyDateFormatter = new Intl.DateTimeFormat('en-US', {
   dateStyle: 'medium',
@@ -47,14 +46,7 @@ export default async function SurveyDetailPage({
               <p className="mt-1 text-muted-foreground">{data.description}</p>
             )}
           </div>
-          {data.status === 'published' && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={publicUrl} target="_blank" rel="noopener noreferrer">
-                <IconExternalLink size={16} />
-                Open Survey
-              </a>
-            </Button>
-          )}
+          <SurveyActions surveyId={surveyId} status={data.status} publicUrl={publicUrl} />
         </div>
 
         <Tabs defaultValue={tab === 'responses' ? 'responses' : 'overview'}>
