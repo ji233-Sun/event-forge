@@ -37,3 +37,9 @@ export const qwenProvider = createOpenAI({
   baseURL: qwenCompatibleBaseURL,
   apiKey: getQwenApiKey(),
 })
+
+// MiniMax OpenAI-compatible endpoint
+export const minimaxProvider = createOpenAI({
+  baseURL: `${minimaxApiBaseURL}/v1`,
+  apiKey: getMinimaxApiKey(),
+})

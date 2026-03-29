@@ -1,18 +1,26 @@
 import { generateText, streamText } from 'ai'
 import type { LanguageModel } from 'ai'
-import { simpleModel, mediumModel, hardModel } from './models'
-import { assertQwenApiKey } from './provider'
+import { simpleModel, mediumModel, hardModel, codeModel } from './models'
+import { assertQwenApiKey, assertMinimaxApiKey } from './provider'
 
 // Re-export model instances for callers that want direct SDK access
-export { simpleModel, mediumModel, hardModel }
+export { simpleModel, mediumModel, hardModel, codeModel }
 
 // Task complexity tier
-export type Tier = 'simple' | 'medium' | 'hard'
+export type Tier = 'simple' | 'medium' | 'hard' | 'code'
 
 const TIER_MODELS: Record<Tier, LanguageModel> = {
   simple: simpleModel,
   medium: mediumModel,
   hard: hardModel,
+  code: codeModel,
+}
+
+const TIER_ASSERTIONS: Record<Tier, () => void> = {
+  simple: assertQwenApiKey,
+  medium: assertQwenApiKey,
+  hard: assertQwenApiKey,
+  code: assertMinimaxApiKey,
 }
 
 // Get model instance by tier
@@ -29,7 +37,7 @@ export async function generate(
   prompt: string,
   options?: GenerateOptions,
 ) {
-  assertQwenApiKey()
+  TIER_ASSERTIONS[tier]()
 
   const params: Parameters<typeof generateText>[0] = {
     model: TIER_MODELS[tier],
@@ -45,7 +53,7 @@ export function stream(
   prompt: string,
   options?: StreamOptions,
 ) {
-  assertQwenApiKey()
+  TIER_ASSERTIONS[tier]()
 
   const params: Parameters<typeof streamText>[0] = {
     model: TIER_MODELS[tier],

@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await generateText({
-      model: getModel('hard'),
+      model: getModel('code'),
       system: SYSTEM_PROMPT,
       prompt: `Create a custom survey question type for: ${prompt.trim()}`,
     })
