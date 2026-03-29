@@ -1,8 +1,11 @@
+import { getAgentTaskWizardState } from '@/components/agent-task/agent-task-state'
+import type { CreationMode } from '@/lib/agent-tasks/types'
 import type { GenerateMinitoolResult, MinitoolRecord } from '@/lib/minitool-runtime/types'
 
 type MinitoolEditorStateInput = {
   editId: string | null
   result: GenerateMinitoolResult | null
+  mode?: CreationMode
 }
 
 type MinitoolSaveRequestInput = {
@@ -22,25 +25,17 @@ export function toEditableMinitoolResult(
   }
 }
 
-export function getMinitoolEditorState({ editId, result }: MinitoolEditorStateInput) {
-  const isEditing = !!editId
-  const hasResult = !!result
-
-  return {
-    isEditing,
-    isPromptLocked: hasResult || isEditing,
-    showSaveAction: hasResult,
-    showIterateSection: hasResult,
-    title: isEditing ? 'Edit Minitool' : 'Create Minitool',
-    description: isEditing
-      ? 'Refine your saved minitool and save updates to the same live tool.'
-      : 'Describe your tool — AI handles the rest.',
-    lockedPromptMessage: isEditing
-      ? 'The original prompt is read-only. Use iteration feedback below to refine this saved minitool.'
-      : 'The initial prompt is locked after generation. Use iteration feedback below to request bug fixes or improvements based on the current result.',
-    saveLabel: isEditing ? 'Save Changes' : 'Save Minitool',
-    nameStepTitle: '3. Name',
-  }
+export function getMinitoolEditorState({
+  editId,
+  result,
+  mode = 'built_in_ai',
+}: MinitoolEditorStateInput) {
+  return getAgentTaskWizardState({
+    resourceKind: 'minitool',
+    creationMode: mode,
+    editId,
+    hasResult: !!result,
+  })
 }
 
 export function buildMinitoolSaveRequest({

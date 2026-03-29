@@ -73,4 +73,20 @@ describe('question type editor state', () => {
       saveLabel: 'Save Changes',
     })
   })
+
+  it('returns the my-agent mode labels when agent mode is selected', () => {
+    expect(
+      getQuestionTypeEditorState({
+        editId: null,
+        result: null,
+        mode: 'my_agent',
+      }),
+    ).toMatchObject({
+      isPromptLocked: false,
+      showAgentStep: true,
+      description:
+        'Hand off the prompt to your external agent with the shared EventForge skill.',
+      modeLabel: 'My Agent',
+    })
+  })
 })

@@ -1,3 +1,5 @@
+import type { CreationMode } from '@/lib/agent-tasks/types'
+
 // Represents one field in an AI-generated custom question
 export type CustomFieldType =
   | 'text'
@@ -34,6 +36,8 @@ export type CustomQuestionType = {
   formCode: string
   displayCode: string
   answerSchema: AnswerJsonSchema
+  creationMode: CreationMode
+  agentTaskId: string | null
   createdAt: Date
   updatedAt: Date
 }

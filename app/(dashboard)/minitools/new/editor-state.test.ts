@@ -75,4 +75,19 @@ describe('minitool editor state', () => {
       saveLabel: 'Save Changes',
     })
   })
+
+  it('returns the my-agent mode labels for minitools', () => {
+    expect(
+      getMinitoolEditorState({
+        editId: null,
+        result: null,
+        mode: 'my_agent',
+      }),
+    ).toMatchObject({
+      showAgentStep: true,
+      modeLabel: 'My Agent',
+      description:
+        'Hand off the prompt to your external agent with the shared EventForge skill.',
+    })
+  })
 })
