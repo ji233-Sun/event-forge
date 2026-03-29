@@ -1,7 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import { parseSlides, getSlideTitle, joinSlides } from './slides'
 
-const SAMPLE = `---
+import { parseSlides as parseSlidesNew } from './slides'
+
+import { getSlideTitle as getSlideTitleNew } from './slides'
+
+const SAMPLE_WITH_FM = `---
 marp: true
 theme: default
 ---
@@ -20,22 +24,24 @@ theme: default
 # Conclusion
 `
 
+const SAMPLE_NO_FM = `# A
+
+---
+
+# B`
+
 describe('parseSlides', () => {
-  it('returns one segment per slide', () => {
-    const slides = parseSlides(SAMPLE)
+  it('splits on --- separators', () => {
+    const slides = parseSlides(SAMPLE_NO_FM)
+    expect(slides).toHaveLength(2)
+  })
+
+  it('strips YAML front-matter before splitting', () => {
+    const slides = parseSlides(SAMPLE_WITH_FM)
     expect(slides).toHaveLength(3)
-  })
-
-  it('segment 0 includes front-matter', () => {
-    const slides = parseSlides(SAMPLE)
-    expect(slides[0]).toContain('marp: true')
+    // Front-matter is stripped, segment 0 starts with the heading
     expect(slides[0]).toContain('# Title Slide')
-  })
-
-  it('segment 1 does not include front-matter', () => {
-    const slides = parseSlides(SAMPLE)
-    expect(slides[1]).not.toContain('marp: true')
-    expect(slides[1]).toContain('## Agenda')
+    expect(slides[0]).not.toContain('marp: true')
   })
 
   it('handles markdown with no front-matter', () => {
@@ -43,41 +49,28 @@ describe('parseSlides', () => {
     expect(slides).toHaveLength(2)
   })
 
-  it('handles CRLF front-matter and slide separators', () => {
-    const slides = parseSlides(
-      [
-        '---',
-        'marp: true',
-        'theme: default',
-        '---',
-        '',
-        '# Title Slide',
-        '',
-        '---',
-        '',
-        '## Agenda',
-      ].join('\r\n')
-    )
+  it('returns empty array for empty input', () => {
+    const slides = parseSlides('')
+    expect(slides).toHaveLength(0)
+  })
 
-    expect(slides).toHaveLength(2)
-    expect(slides[0]).toContain('marp: true')
-    expect(slides[0]).toContain('# Title Slide')
-    expect(slides[1]).toContain('## Agenda')
+  it('returns empty array for front-matter only', () => {
+    const slides = parseSlides('---\nmarp: true\n---')
+    expect(slides).toHaveLength(0)
   })
 })
 
 describe('joinSlides', () => {
-  it('round-trip: parseSlides → joinSlides produces re-renderable markdown', () => {
-    const segments = parseSlides(SAMPLE)
+  it('round-trip: parseSlides → joinSlides produces equivalent split', () => {
+    const segments = parseSlides(SAMPLE_NO_FM)
     const rejoined = joinSlides(segments)
     // Re-parsed segment count must match original
-    expect(parseSlides(rejoined)).toHaveLength(3)
-    // Front-matter must be preserved
-    expect(rejoined).toContain('marp: true')
-    // All headings must be present
-    expect(rejoined).toContain('# Title Slide')
-    expect(rejoined).toContain('## Agenda')
-    expect(rejoined).toContain('# Conclusion')
+    expect(parseSlides(rejoined)).toHaveLength(2)
+  })
+
+  it('joins segments with --- separator', () => {
+    const result = joinSlides(['# A', '# B', '# C'])
+    expect(result).toBe('# A\n\n---\n\n# B\n\n---\n\n# C')
   })
 })
 

@@ -65,3 +65,9 @@ EventForge 后台的 Agent 会自动拆解任务，并在前端页面上**像卡
 - **数据库**：`Supabase` (完美解决动态表单的数据入库需求)。
 - **ORM**: `Drizzle ORM`
 - **邮件发送**: `Nodemailer` (SMTP)
+
+---
+
+## 4. 架构收敛与执行 To-Do（从 Plan 到 Implementation）
+
+

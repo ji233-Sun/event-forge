@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { SlidePreview, type SlidePreviewHandle } from '@/components/slide-preview'
+import { SlideRenderer } from '@/components/slides/SlideRenderer'
 import { ThumbnailStrip } from '@/components/slide-studio/thumbnail-strip'
 import { EditPanel } from '@/components/slide-studio/edit-panel'
 import { StylePanel } from '@/components/slide-studio/style-panel'
@@ -14,12 +15,12 @@ import {
   updateDeckImages,
   deleteDeck,
   getDeck,
-  renderMarkdown,
 } from './actions'
 import type { DeckSummary, SlideMode, ImageSlide } from './actions'
 import { ImageGeneratingScreen } from '@/components/slide-studio/image-generating-screen'
 import { ImageStudioView } from '@/components/slide-studio/image-studio-view'
 import { StylePickerScreen } from '@/components/slide-studio/style-picker-screen'
+import { SlidesGeneratingScreen } from '@/components/slide-studio/slides-generating-screen'
 import type { ImageSlideState } from '@/components/slide-studio/image-types'
 import {
   createInitialTemplateStoreState,
@@ -38,15 +39,10 @@ import {
   IconPresentation,
   IconTrash,
   IconClock,
+  IconFileTypePdf,
 } from '@tabler/icons-react'
 
 type Phase = 'input' | 'style-pick' | 'generating' | 'studio' | 'image-generating' | 'image-studio'
-
-interface SlideSession {
-  markdown: string
-  html: string
-  css: string
-}
 
 const samplePrompts = [
   'A campus country music festival for 200 attendees with sponsor booths, handmade market stalls, and food pop-ups.',
@@ -64,7 +60,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const [prompt, setPrompt] = useState('')
   const [generateError, setGenerateError] = useState<string | null>(null)
 
-  const [session, setSession] = useState<SlideSession | null>(null)
+  const [markdown, setMarkdown] = useState<string | null>(null)
   const [deckId, setDeckId] = useState<string | null>(null)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
   const currentSlideIndexRef = useRef(currentSlideIndex)
@@ -74,6 +70,9 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
 
   const [editLoading, setEditLoading] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [isExportingPdf, setIsExportingPdf] = useState(false)
+  const [exportCaptureIndex, setExportCaptureIndex] = useState(0)
 
   const [templateState, setTemplateState] = useState<TemplateStoreState>(
     () => createInitialTemplateStoreState()
@@ -89,8 +88,11 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const [imageSlideStates, setImageSlideStates] = useState<ImageSlideState[]>([])
   const [imageGenerateError, setImageGenerateError] = useState<string | null>(null)
   const [imageDeckTitle, setImageDeckTitle] = useState<string>('Slide Deck')
+  const [slideCount, setSlideCount] = useState(8)
 
   const previewRef = useRef<SlidePreviewHandle>(null)
+  const exportSlideRef = useRef<HTMLDivElement>(null)
+  const slides = useMemo(() => (markdown ? parseSlides(markdown) : []), [markdown])
 
   // ── Generate ──────────────────────────────────────────────────────────
   async function handleGenerate() {
@@ -102,7 +104,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       const res = await fetch('/api/generate-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, templateValues: getTemplateValues(templateState) }),
+        body: JSON.stringify({ prompt, templateValues: getTemplateValues(templateState), slideCount }),
       })
 
       if (!res.ok) {
@@ -111,10 +113,11 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         throw new Error(message)
       }
 
-      const data = (await res.json()) as { html?: string; css?: string; markdown?: string }
-      if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
+      const data = (await res.json()) as { markdown?: string }
+      if (!data.markdown) throw new Error('Invalid response')
 
-      const title = getSlideTitle(parseSlides(data.markdown)[0], 'Untitled Deck')
+      const slides = parseSlides(data.markdown)
+      const title = getSlideTitle(slides[0], 'Untitled Deck')
       const saved = await saveDeck({
         title,
         prompt: prompt.trim(),
@@ -125,7 +128,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
 
       setDeckId(saved.id)
       setDecks((prev) => [{ id: saved.id, title, prompt: prompt.trim(), mode: 'marp', createdAt: new Date() }, ...prev])
-      setSession({ html: data.html, css: data.css, markdown: data.markdown })
+      setMarkdown(data.markdown)
       setCurrentSlideIndex(0)
       setPhase('studio')
     } catch (e) {
@@ -235,7 +238,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   // ── Edit ──────────────────────────────────────────────────────────────
   const handleEdit = useCallback(
     async (instruction: string, scope: 'current' | 'all') => {
-      if (!session) return
+      if (!markdown) return
       setEditLoading(true)
       setEditError(null)
 
@@ -244,7 +247,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            markdown: session.markdown,
+            markdown,
             instruction,
             scope,
             currentSlideIndex: currentSlideIndexRef.current,
@@ -257,8 +260,8 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           throw new Error(message)
         }
 
-        const data = (await res.json()) as { html?: string; css?: string; markdown?: string }
-        if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
+        const data = (await res.json()) as { markdown?: string }
+        if (!data.markdown) throw new Error('Invalid response')
 
         if (deckId) await updateDeckMarkdown(deckId, data.markdown)
 
@@ -267,7 +270,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           ? currentSlideIndexRef.current
           : newSlideCount - 1
 
-        setSession({ html: data.html, css: data.css, markdown: data.markdown })
+        setMarkdown(data.markdown)
         setCurrentSlideIndex(nextIndex)
       } catch (e) {
         setEditError(e instanceof Error ? e.message : 'Something went wrong')
@@ -275,14 +278,14 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         setEditLoading(false)
       }
     },
-    [session, deckId],
+    [markdown, deckId],
   )
 
   const handleTemplateValueChange = useCallback(
     <K extends TemplateKey>(key: K, value: TemplateValues[K]) => {
       setTemplateState((prev) => setTemplateValue(prev, key, value))
     },
-    []
+    [],
   )
 
   const handleToggleLock = useCallback((key: TemplateKey) => {
@@ -293,9 +296,76 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     setTemplateState((prev) => shuffleTemplateState(prev))
   }, [])
 
-  // Shared restyle helper: replaces CSS + ECharts colors, updates session + DB
+  const handleDownloadPdf = useCallback(async () => {
+    if (slides.length === 0 || isExportingPdf) return
+
+    setExportError(null)
+    setIsExportingPdf(true)
+
+    try {
+      const { toPng } = await import('html-to-image')
+      const { PDFDocument } = await import('pdf-lib')
+
+      const doc = await PDFDocument.create()
+      const title = getSlideTitle(slides[0], 'slide-deck')
+      doc.setTitle(title)
+
+      // Wait for async font loading to avoid text jumps between pages.
+      if ('fonts' in document) {
+        await document.fonts.ready
+      }
+
+      // 16:9 in points (1 pt = 1/72 inch; 13.33" × 7.5" = 960 × 540 pt)
+      const W = 960
+      const H = 540
+
+      for (let i = 0; i < slides.length; i += 1) {
+        setExportCaptureIndex(i)
+
+        // Give charts and markdown layout a moment to settle before capture.
+        await new Promise((resolve) => setTimeout(resolve, 120))
+
+        const target = exportSlideRef.current
+        if (!target) continue
+
+        const pngDataUrl = await toPng(target, {
+          cacheBust: true,
+          pixelRatio: 2,
+          width: 1280,
+          height: 720,
+          backgroundColor: '#000000',
+        })
+
+        const pngBytes = await fetch(pngDataUrl).then((res) => res.arrayBuffer())
+        const image = await doc.embedPng(pngBytes)
+        const page = doc.addPage([W, H])
+        page.drawImage(image, { x: 0, y: 0, width: W, height: H })
+      }
+
+      const pdfBytes = await doc.save()
+      const pdfArrayBuffer = new ArrayBuffer(pdfBytes.byteLength)
+      new Uint8Array(pdfArrayBuffer).set(pdfBytes)
+      const safeTitle = title.replace(/[\\/:*?"<>|\r\n]/g, '-').trim() || 'slide-deck'
+      const blob = new Blob([pdfArrayBuffer], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${safeTitle}.pdf`
+      document.body.appendChild(anchor)
+      anchor.click()
+      document.body.removeChild(anchor)
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Failed to export PDF')
+    } finally {
+      setIsExportingPdf(false)
+      setExportCaptureIndex(0)
+    }
+  }, [slides, isExportingPdf])
+
+  // Shared restyle helper: replaces ECharts colors, updates markdown + DB
   const handleRestyle = useCallback(async (prevValues: TemplateValues, newValues: TemplateValues) => {
-    if (!session) return
+    if (!markdown) return
     setIsRestyling(true)
     setRestyleError(null)
     try {
@@ -303,7 +373,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          markdown: session.markdown,
+          markdown,
           prevTemplateValues: prevValues,
           templateValues: newValues,
         }),
@@ -313,16 +383,16 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         try { const err = (await res.json()) as { error?: string }; message = err.error ?? message } catch { /* */ }
         throw new Error(message)
       }
-      const data = (await res.json()) as { html?: string; css?: string; markdown?: string }
-      if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
+      const data = (await res.json()) as { markdown?: string }
+      if (!data.markdown) throw new Error('Invalid response')
       if (deckId) await updateDeckMarkdown(deckId, data.markdown)
-      setSession({ html: data.html, css: data.css, markdown: data.markdown })
+      setMarkdown(data.markdown)
     } catch (e) {
       setRestyleError(e instanceof Error ? e.message : 'Restyle failed')
     } finally {
       setIsRestyling(false)
     }
-  }, [session, deckId])
+  }, [markdown, deckId])
 
   const handleShuffle = useCallback(() => {
     const prevValues = getTemplateValues(templateState)
@@ -339,7 +409,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       setTemplateState((prev) => setTemplateValue(prev, key, value))
       void handleRestyle(prevValues, newValues as TemplateValues)
     },
-    [templateState, handleRestyle]
+    [templateState, handleRestyle],
   )
 
   // Apply a decoded preset in Studio: restyle with ECharts color replacement
@@ -347,7 +417,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     const prevValues = getTemplateValues(templateState)
     setTemplateState((prev) => {
       return Object.fromEntries(
-        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }])
+        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }]),
       ) as TemplateStoreState
     })
     void handleRestyle(prevValues, newValues)
@@ -357,7 +427,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const handlePreGenPresetApply = useCallback((newValues: TemplateValues) => {
     setTemplateState((prev) => {
       return Object.fromEntries(
-        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }])
+        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }]),
       ) as TemplateStoreState
     })
   }, [])
@@ -367,7 +437,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     const slideState = imageSlideStates.find((s) => s.index === index)
     if (!slideState) return
     setImageSlideStates((prev) =>
-      prev.map((s) => (s.index === index ? { ...s, status: 'generating' as const, url: undefined } : s))
+      prev.map((s) => (s.index === index ? { ...s, status: 'generating' as const, url: undefined } : s)),
     )
     try {
       const res = await fetch('/api/generate-slide-image', {
@@ -379,7 +449,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       const img = await res.json() as { index: number; url: string }
       setImageSlideStates((prev) => {
         const next = prev.map((s) =>
-          s.index === index ? { ...s, status: 'done' as const, url: img.url } : s
+          s.index === index ? { ...s, status: 'done' as const, url: img.url } : s,
         )
         if (deckId) {
           const persisted: ImageSlide[] = next.map((s) => ({
@@ -394,7 +464,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       })
     } catch {
       setImageSlideStates((prev) =>
-        prev.map((s) => (s.index === index ? { ...s, status: 'failed' as const } : s))
+        prev.map((s) => (s.index === index ? { ...s, status: 'failed' as const } : s)),
       )
     }
   }
@@ -404,6 +474,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     setLoadingDeckId(id)
     setGenerateError(null)
     setImageGenerateError(null)
+    setExportError(null)
     try {
       const d = await getDeck(id)
 
@@ -412,7 +483,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         setTemplateState((prev) => {
           const tv = d.templateValues!
           return Object.fromEntries(
-            TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: tv[key] }])
+            TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: tv[key] }]),
           ) as TemplateStoreState
         })
       }
@@ -427,9 +498,9 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         setDeckId(d.id)
         setPhase('image-studio')
       } else {
-        const { html, css } = await renderMarkdown(d.markdown ?? '')
+        // Load markdown directly — no server-side rendering needed
         setDeckId(d.id)
-        setSession({ html, css, markdown: d.markdown ?? '' })
+        setMarkdown(d.markdown ?? '')
         setCurrentSlideIndex(0)
         setPhase('studio')
       }
@@ -452,7 +523,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   }
 
   // ── Derived state ─────────────────────────────────────────────────────
-  const slides = session ? parseSlides(session.markdown) : []
+  const currentTemplateValues = getTemplateValues(templateState)
   const titles = slides.map((seg, i) => getSlideTitle(seg, `Slide ${i + 1}`))
 
   // ── Render: Style Pick ────────────────────────────────────────────────
@@ -475,13 +546,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
 
   // ── Render: Generating ────────────────────────────────────────────────
   if (phase === 'generating') {
-    return (
-      <div className="flex h-[calc(100vh-3rem)] flex-col items-center justify-center gap-4">
-        <IconLoader2 className="size-10 animate-spin text-muted-foreground" />
-        <p className="text-lg font-medium">Crafting your slides...</p>
-        <p className="text-sm text-muted-foreground">This usually takes 15-30 seconds</p>
-      </div>
-    )
+    return <SlidesGeneratingScreen />
   }
 
   // ── Render: Image Generating ──────────────────────────────────────────
@@ -522,7 +587,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             size="sm"
             onClick={() => {
               setPhase('input')
-              setSession(null)
+              setMarkdown(null)
               setDeckId(null)
               setCurrentSlideIndex(0)
               setEditError(null)
@@ -534,12 +599,31 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           <h1 className="text-sm font-semibold">Slide Studio</h1>
           <div className="ml-auto flex items-center gap-2">
             <span className="text-xs text-muted-foreground">{slides.length} slides</span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadPdf}
+              disabled={slides.length === 0 || isExportingPdf}
+            >
+              {isExportingPdf ? (
+                <IconLoader2 className="mr-1 size-4 animate-spin" />
+              ) : (
+                <IconFileTypePdf className="mr-1 size-4" />
+              )}
+              {isExportingPdf ? 'Exporting PDF...' : 'Download PDF'}
+            </Button>
             <Button variant="outline" size="sm" onClick={() => previewRef.current?.present()}>
               <IconPresentation className="mr-1 size-4" />
               Present
             </Button>
           </div>
         </header>
+
+        {exportError && (
+          <div className="border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+            {exportError}
+          </div>
+        )}
 
         <div className="flex flex-1 overflow-hidden">
           <aside className="w-40 shrink-0 overflow-y-auto border-r">
@@ -551,11 +635,11 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             />
           </aside>
           <main className="flex-1 overflow-hidden bg-black">
-            {session && (
+            {markdown && (
               <SlidePreview
                 ref={previewRef}
-                html={session.html}
-                css={session.css}
+                markdown={markdown}
+                templateValues={currentTemplateValues}
                 currentSlide={currentSlideIndex}
                 onSlideChange={setCurrentSlideIndex}
               />
@@ -613,6 +697,18 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             </div>
           </aside>
         </div>
+
+        {/* Offscreen slide canvas used only for PDF capture */}
+        {slides.length > 0 && (
+          <div className="pointer-events-none fixed -left-[200vw] top-0 h-[720px] w-[1280px] opacity-0" aria-hidden>
+            <div ref={exportSlideRef} className="h-full w-full">
+              <SlideRenderer
+                content={slides[exportCaptureIndex] ?? ''}
+                templateValues={currentTemplateValues}
+              />
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -649,6 +745,30 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
           />
+          {/* Slide count selector — Markdown mode only */}
+          {slideMode === 'marp' && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Pages:</span>
+            <button
+              type="button"
+              className="flex size-7 items-center justify-center rounded-md border border-input text-sm hover:bg-muted disabled:opacity-40"
+              disabled={slideCount <= 4}
+              onClick={() => setSlideCount((n) => Math.max(4, n - 1))}
+            >
+              -
+            </button>
+            <span className="w-6 text-center text-sm font-medium">{slideCount}</span>
+            <button
+              type="button"
+              className="flex size-7 items-center justify-center rounded-md border border-input text-sm hover:bg-muted disabled:opacity-40"
+              disabled={slideCount >= 16}
+              onClick={() => setSlideCount((n) => Math.min(16, n + 1))}
+            >
+              +
+            </button>
+          </div>
+          )}
+
           <div className="flex flex-wrap items-center gap-2">
             <Button
               onClick={slideMode === 'marp' ? () => setPhase('style-pick') : handleGenerateImages}
@@ -675,7 +795,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
                     : 'bg-background text-muted-foreground hover:bg-muted',
                 ].join(' ')}
               >
-                Marp
+                Markdown
               </button>
               <button
                 type="button"
@@ -717,7 +837,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
                       <div className="flex items-center gap-1.5">
                         <p className="truncate text-sm font-medium">{d.title}</p>
                         <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                          {d.mode === 'image' ? 'Image' : 'Marp'}
+                          {d.mode === 'image' ? 'Image' : 'MD'}
                         </span>
                       </div>
                       <p className="truncate text-xs text-muted-foreground">

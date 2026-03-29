@@ -1,11 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { mockGenerate, mockRender, mockGetSession, mockHeaders } = vi.hoisted(() => ({
+const { mockGenerate, mockGetSession, mockHeaders } = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
-  mockRender: vi.fn(() => ({
-    html: "<section>Rendered</section>",
-    css: "section { color: red; }",
-  })),
   mockGetSession: vi.fn(),
   mockHeaders: vi.fn(),
 }));
@@ -26,23 +22,12 @@ vi.mock("next/headers", () => ({
   headers: mockHeaders,
 }));
 
-vi.mock("@marp-team/marp-core", () => ({
-  default: class MockMarp {
-    render = mockRender;
-  },
-}));
-
 import { POST } from "./route";
 
 afterEach(() => {
   mockGenerate.mockReset();
-  mockRender.mockReset();
   mockGetSession.mockReset();
   mockHeaders.mockReset();
-  mockRender.mockImplementation(() => ({
-    html: "<section>Rendered</section>",
-    css: "section { color: red; }",
-  }));
   mockGetSession.mockResolvedValue({ user: { id: "user_123" } });
   mockHeaders.mockResolvedValue(new Headers());
 });
@@ -96,24 +81,19 @@ describe("POST /api/edit-slides", () => {
     });
   });
 
-  it("preserves CRLF front-matter when editing the first slide", async () => {
+  it("edits a single slide and preserves the rest of the deck", async () => {
     mockGenerate.mockResolvedValue({
-      text: "# Updated Title\r\n\r\nUpdated content",
+      text: "# Updated Title\n\nUpdated content",
       finishReason: "stop",
     });
 
     const markdown = [
-      "---",
-      "marp: true",
-      "theme: default",
-      "---",
-      "",
       "# Title Slide",
       "",
       "---",
       "",
       "## Agenda",
-    ].join("\r\n");
+    ].join("\n");
 
     const request = new Request("http://localhost/api/edit-slides", {
       method: "POST",
@@ -128,16 +108,12 @@ describe("POST /api/edit-slides", () => {
 
     const response = await POST(request);
     const payload = (await response.json()) as {
-      html?: string;
-      css?: string;
       markdown?: string;
     };
 
     expect(response.status).toBe(200);
     expect(mockGenerate).toHaveBeenCalledTimes(1);
     expect(mockGenerate.mock.calls[0]?.[1]).toContain("# Title Slide");
-    expect(mockGenerate.mock.calls[0]?.[1]).not.toContain("marp: true");
-    expect(payload.markdown).toMatch(/^---\r\nmarp: true\r\ntheme: default\r\n---/);
     expect(payload.markdown).toContain("# Updated Title");
     expect(payload.markdown).toContain("## Agenda");
   });

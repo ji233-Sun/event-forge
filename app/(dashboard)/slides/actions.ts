@@ -125,11 +125,3 @@ export async function deleteDeck(deckId: string): Promise<void> {
 
   await db.delete(deck).where(eq(deck.id, deckId))
 }
-
-export async function renderMarkdown(markdownInput: string): Promise<{ html: string; css: string }> {
-  await requireAuth()
-  const Marp = (await import('@marp-team/marp-core')).default
-  const marp = new Marp({ html: true })
-  const { html, css } = marp.render(markdownInput)
-  return { html, css }
-}

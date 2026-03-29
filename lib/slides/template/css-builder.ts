@@ -19,6 +19,11 @@ export type Palette = {
   cardBorder: string;
 };
 
+export type ResolvedBackgroundStyle = {
+  background: string;
+  backgroundSize?: string;
+};
+
 const PRIMARY_TONES: Record<PrimaryColor, { primary: string; secondary: string; accent: string }> = {
   cyan: { primary: "#06b6d4", secondary: "#0891b2", accent: "#67e8f9" },
   violet: { primary: "#8b5cf6", secondary: "#7c3aed", accent: "#c4b5fd" },
@@ -37,15 +42,15 @@ const BASE_TONES: Record<
 > = {
   slate: {
     light: { slideBg: "#f8fafc", slideText: "#0f172a", slideMuted: "#475569", cardBg: "rgba(255,255,255,0.72)", cardBorder: "rgba(71,85,105,0.22)" },
-    dark: { slideBg: "#0f172a", slideText: "#e2e8f0", slideMuted: "#94a3b8", cardBg: "rgba(15,23,42,0.55)", cardBorder: "rgba(148,163,184,0.25)" },
+    dark: { slideBg: "#0f172a", slideText: "#f8fafc", slideMuted: "#cbd5e1", cardBg: "rgba(9,15,28,0.9)", cardBorder: "rgba(148,163,184,0.34)" },
   },
   zinc: {
     light: { slideBg: "#fafafa", slideText: "#18181b", slideMuted: "#52525b", cardBg: "rgba(255,255,255,0.76)", cardBorder: "rgba(82,82,91,0.24)" },
-    dark: { slideBg: "#18181b", slideText: "#f4f4f5", slideMuted: "#a1a1aa", cardBg: "rgba(24,24,27,0.6)", cardBorder: "rgba(161,161,170,0.24)" },
+    dark: { slideBg: "#18181b", slideText: "#fafafa", slideMuted: "#d4d4d8", cardBg: "rgba(24,24,27,0.9)", cardBorder: "rgba(161,161,170,0.34)" },
   },
   neutral: {
     light: { slideBg: "#fafafa", slideText: "#171717", slideMuted: "#525252", cardBg: "rgba(255,255,255,0.78)", cardBorder: "rgba(82,82,82,0.24)" },
-    dark: { slideBg: "#171717", slideText: "#f5f5f5", slideMuted: "#a3a3a3", cardBg: "rgba(23,23,23,0.62)", cardBorder: "rgba(163,163,163,0.24)" },
+    dark: { slideBg: "#171717", slideText: "#fafafa", slideMuted: "#d4d4d4", cardBg: "rgba(20,20,20,0.9)", cardBorder: "rgba(163,163,163,0.34)" },
   },
 };
 
@@ -83,41 +88,113 @@ export function resolvePalette(values: TemplateValues): Palette {
   return { ...base, ...accents };
 }
 
-function backgroundCss(values: TemplateValues, palette: Palette): string {
+function toRgba(hexColor: string, alpha: number): string {
+  const clean = hexColor.replace("#", "").trim();
+  if (!/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(clean)) {
+    return hexColor;
+  }
+
+  const expanded = clean.length === 3
+    ? clean.split("").map((part) => `${part}${part}`).join("")
+    : clean;
+
+  const r = Number.parseInt(expanded.slice(0, 2), 16);
+  const g = Number.parseInt(expanded.slice(2, 4), 16);
+  const b = Number.parseInt(expanded.slice(4, 6), 16);
+  const a = Math.max(0, Math.min(1, alpha));
+  return `rgba(${r}, ${g}, ${b}, ${a})`;
+}
+
+export function resolveBackgroundStyle(values: TemplateValues, palette: Palette): ResolvedBackgroundStyle {
+  const isDark = values.themeMode === "dark";
+  const primaryGlow = toRgba(palette.primary, isDark ? 0.14 : 0.22);
+  const secondaryGlow = toRgba(palette.secondary, isDark ? 0.12 : 0.18);
+  const accentGlow = toRgba(palette.accent, isDark ? 0.1 : 0.16);
+
   switch (values.bgStyle) {
     case "solid":
-      return `background: ${palette.slideBg};`;
+      return {
+        background: palette.slideBg,
+      };
     case "linear-gradient":
-      return `background: linear-gradient(145deg, ${palette.slideBg} 0%, ${palette.secondary}66 100%);`;
+      return isDark
+        ? {
+          background: `
+        radial-gradient(120% 95% at 86% 2%, ${primaryGlow} 0%, transparent 58%),
+        radial-gradient(95% 105% at 8% 96%, ${secondaryGlow} 0%, transparent 62%),
+        linear-gradient(145deg, ${palette.slideBg} 0%, ${palette.slideBg} 100%)`,
+        }
+        : {
+          background: `linear-gradient(145deg, ${palette.slideBg} 0%, ${toRgba(palette.secondary, 0.26)} 100%)`,
+        };
     case "radial-gradient":
-      return `background:
-        radial-gradient(1100px 460px at 12% -8%, ${palette.primary}33, transparent 58%),
-        radial-gradient(980px 440px at 100% 0%, ${palette.secondary}2a, transparent 56%),
-        linear-gradient(140deg, ${palette.slideBg} 0%, ${palette.secondary}88 100%);`;
+      return isDark
+        ? {
+          background: `
+        radial-gradient(1080px 460px at 12% -8%, ${primaryGlow} 0%, transparent 60%),
+        radial-gradient(980px 440px at 100% 0%, ${secondaryGlow} 0%, transparent 58%),
+        radial-gradient(920px 460px at 50% 110%, ${accentGlow} 0%, transparent 66%),
+        linear-gradient(140deg, ${palette.slideBg} 0%, ${palette.slideBg} 100%)`,
+        }
+        : {
+          background: `
+        radial-gradient(1080px 460px at 12% -8%, ${toRgba(palette.primary, 0.26)} 0%, transparent 58%),
+        radial-gradient(980px 440px at 100% 0%, ${toRgba(palette.secondary, 0.2)} 0%, transparent 56%),
+        linear-gradient(140deg, ${palette.slideBg} 0%, ${toRgba(palette.secondary, 0.35)} 100%)`,
+        };
     case "mesh":
-      return `background:
-        radial-gradient(at 20% 20%, ${palette.primary}2b 0px, transparent 50%),
-        radial-gradient(at 80% 10%, ${palette.secondary}2f 0px, transparent 50%),
-        radial-gradient(at 70% 75%, ${palette.accent}2d 0px, transparent 50%),
-        ${palette.slideBg};`;
+      return isDark
+        ? {
+          background: `
+        radial-gradient(at 20% 20%, ${primaryGlow} 0px, transparent 52%),
+        radial-gradient(at 80% 10%, ${secondaryGlow} 0px, transparent 52%),
+        radial-gradient(at 70% 75%, ${accentGlow} 0px, transparent 52%),
+        ${palette.slideBg}`,
+        }
+        : {
+          background: `
+        radial-gradient(at 20% 20%, ${toRgba(palette.primary, 0.2)} 0px, transparent 50%),
+        radial-gradient(at 80% 10%, ${toRgba(palette.secondary, 0.18)} 0px, transparent 50%),
+        radial-gradient(at 70% 75%, ${toRgba(palette.accent, 0.18)} 0px, transparent 50%),
+        ${palette.slideBg}`,
+        };
     case "dots":
-      return `background:
-        radial-gradient(${palette.slideMuted}22 1px, transparent 1px),
-        linear-gradient(140deg, ${palette.slideBg} 0%, ${palette.secondary}66 100%);
-      background-size: 14px 14px, 100% 100%;`;
+      return isDark
+        ? {
+          background: `
+        radial-gradient(rgba(255,255,255,0.08) 1px, transparent 1px),
+        linear-gradient(140deg, ${palette.slideBg} 0%, ${palette.slideBg} 100%)`,
+          backgroundSize: "14px 14px, 100% 100%",
+        }
+        : {
+          background: `
+        radial-gradient(${toRgba(palette.slideMuted, 0.18)} 1px, transparent 1px),
+        linear-gradient(140deg, ${palette.slideBg} 0%, ${toRgba(palette.secondary, 0.24)} 100%)`,
+          backgroundSize: "14px 14px, 100% 100%",
+        };
   }
 }
 
-function cardCss(cardStyle: CardStyle, palette: Palette): string {
+function backgroundCss(values: TemplateValues, palette: Palette): string {
+  const resolved = resolveBackgroundStyle(values, palette);
+  const chunks = [`background: ${resolved.background};`];
+  if (resolved.backgroundSize) {
+    chunks.push(`background-size: ${resolved.backgroundSize};`);
+  }
+  return chunks.join("\n  ");
+}
+
+function cardCss(values: TemplateValues, cardStyle: CardStyle, palette: Palette): string {
+  const isDark = values.themeMode === "dark";
   switch (cardStyle) {
     case "flat":
       return `\n.panel, .kpi {\n  background: ${palette.cardBg};\n  border: 1px solid ${palette.cardBorder};\n  box-shadow: none;\n}`;
     case "glassmorphism":
-      return `\n.panel, .kpi {\n  background: ${palette.cardBg};\n  border: 1px solid ${palette.primary}40;\n  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.2);\n  backdrop-filter: blur(12px);\n}`;
+      return `\n.panel, .kpi {\n  background: ${isDark ? toRgba(palette.slideBg, 0.78) : palette.cardBg};\n  border: 1px solid ${toRgba(palette.primary, isDark ? 0.34 : 0.25)};\n  box-shadow: 0 14px 28px rgba(15, 23, 42, 0.2);\n  backdrop-filter: blur(12px);\n}`;
     case "neumorphism":
       return `\n.panel, .kpi {\n  background: ${palette.cardBg};\n  border: 1px solid ${palette.cardBorder};\n  box-shadow: 10px 10px 20px rgba(15, 23, 42, 0.22), -8px -8px 18px rgba(255, 255, 255, 0.05);\n}`;
     case "brutalism":
-      return `\n.panel, .kpi {\n  background: ${palette.cardBg};\n  border: 3px solid ${palette.primary};\n  box-shadow: 8px 8px 0 ${palette.secondary};\n}`;
+      return `\n.panel, .kpi {\n  background: ${isDark ? toRgba(palette.slideBg, 0.94) : palette.cardBg};\n  border: 3px solid ${palette.primary};\n  box-shadow: 8px 8px 0 ${isDark ? toRgba(palette.secondary, 0.78) : palette.secondary};\n}`;
   }
 }
 
@@ -167,13 +244,15 @@ section::before {
 
 h1, h2, h3 { font-family: ${headingFont}; margin: 0 0 14px; letter-spacing: 0.4px; }
 h1 { color: var(--color-primary, ${palette.primary}); font-size: 58px; }
-h2 { color: var(--color-secondary, ${palette.secondary}); font-size: 38px; }
-h3 { color: var(--color-accent, ${palette.accent}); font-size: 28px; }
-p, li { font-size: 22px; }
-strong { color: var(--color-primary, ${palette.primary}); }
+h2 { color: var(--slide-text, ${palette.slideText}); font-size: 38px; }
+h3 { color: var(--slide-text, ${palette.slideText}); font-size: 28px; }
+p, li { font-size: 22px; color: var(--slide-text, ${palette.slideText}); }
+ul, ol { color: var(--slide-text, ${palette.slideText}); }
+li::marker { color: var(--slide-text, ${palette.slideText}); }
+strong { color: var(--slide-text, ${palette.slideText}); font-weight: 700; }
 
 .cover h1 { text-align: center; margin-top: 42px; }
-.cover p { text-align: center; color: var(--color-accent, ${palette.accent}); font-size: 28px; }
+.cover p { text-align: center; color: var(--slide-text, ${palette.slideText}); opacity: 0.92; font-size: 28px; }
 
 .panel { margin-top: 12px; border-radius: var(--radius, ${radius}); padding: 14px 16px; }
 .two-col { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 18px; align-items: start; }
@@ -193,69 +272,8 @@ strong { color: var(--color-primary, ${palette.primary}); }
 
 .chart-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px; }
 .chart-row .echarts-chart { height: 230px; }
-${cardCss(values.cardStyle, palette)}`;
+${cardCss(values, values.cardStyle, palette)}`;
 
   return { style, palette };
 }
 
-/**
- * Replace literal ECharts palette hex colors inside `data-option='...'` attributes.
- * Scans for hex color literals matching old palette values and substitutes new ones.
- * Replacement is done in a single pass per attribute to avoid transitive collisions.
- */
-export function replaceEChartsColors(
-  markdown: string,
-  oldPalette: Palette,
-  newPalette: Palette,
-): string {
-  // Build case-insensitive map: lowercase old hex → new hex
-  const map = new Map<string, string>();
-  for (const key of Object.keys(oldPalette) as Array<keyof Palette>) {
-    const oldColor = oldPalette[key];
-    const newColor = newPalette[key];
-    if (oldColor && newColor && oldColor.toLowerCase() !== newColor.toLowerCase()) {
-      map.set(oldColor.toLowerCase(), newColor);
-    }
-  }
-  if (map.size === 0) return markdown;
-
-  // Replace only within data-option='...' attribute values (single-quoted)
-  return markdown.replace(/data-option='([^']*)'/g, (_, json: string) => {
-    const updated = json.replace(/#[0-9a-fA-F]{6}/g, (hex) => map.get(hex.toLowerCase()) ?? hex);
-    return `data-option='${updated}'`;
-  });
-}
-
-/**
- * Replace the `style: |` block in a Marp front-matter with new CSS.
- * If the block is missing, inserts it inside the front-matter.
- * If no front-matter exists at all, prepends a minimal one.
- */
-export function replaceMarkdownStyle(markdown: string, newCss: string): string {
-  const indented = newCss
-    .trim()
-    .split("\n")
-    .map((line) => `  ${line}`)
-    .join("\n");
-
-  const styleBlock = `style: |\n${indented}\n`;
-
-  // Case 1: existing style block — replace it
-  const replaced = markdown.replace(
-    /^style: \|[\s\S]*?(?=^---\s*$)/m,
-    styleBlock,
-  );
-  if (replaced !== markdown) return replaced;
-
-  // Case 2: front-matter exists without a style block — insert before closing ---
-  const hasFrontMatter = /^---\s*\n[\s\S]*?\n---\s*(\n|$)/.test(markdown);
-  if (hasFrontMatter) {
-    return markdown.replace(
-      /^(---\s*\n[\s\S]*?)(---\s*(\n|$))/,
-      (_, head, tail) => `${head}${styleBlock}${tail}`,
-    );
-  }
-
-  // Case 3: no front-matter — prepend one with the style block
-  return `---\n${styleBlock}---\n\n${markdown}`;
-}
