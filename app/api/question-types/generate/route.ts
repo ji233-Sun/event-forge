@@ -48,6 +48,10 @@ FORM VS DISPLAY BEHAVIOR — MANDATORY:
   - Include complete input flow: editable controls, state updates, and onChange calls whenever the answer changes.
   - Include visible feedback states such as loading/submitted/error/pending when relevant.
   - The participant should understand what happened after each action.
+  - If you use AI hooks (useImageGen, useMusicGen, useChat):
+    • useImageGen / useMusicGen: Display the generated image/audio directly in formCode. The participant must see what was created.
+    • useChat: Display the conversation or summarized text results clearly in formCode.
+    Save the generated output to the answer (onChange) so it persists when submitted.
 - displayCode is for the data/results screen. It MUST be a static read-only view.
   - Do NOT include input controls, submit buttons, upload triggers, chat send actions, or any onChange calls.
   - Do NOT mutate data in displayCode. No answer editing, no save actions.
