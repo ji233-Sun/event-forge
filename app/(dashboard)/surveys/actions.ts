@@ -1,6 +1,6 @@
 'use server'
 
-import { eq, and, count, or, inArray } from 'drizzle-orm'
+import { eq, and, or, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { survey, question, response, customQuestionType } from '@/lib/db/auth-schema'
 import { auth } from '@/lib/auth'
@@ -187,15 +187,6 @@ export async function saveQuestions(surveyId: string, questionsInput: QuestionIn
 
   // Atomically delete existing questions and re-insert
   await db.transaction(async (tx) => {
-    const [{ value: responseCount }] = await tx
-      .select({ value: count() })
-      .from(response)
-      .where(eq(response.surveyId, surveyId))
-
-    if (responseCount > 0) {
-      throw new Error('Cannot modify questions after responses have been collected')
-    }
-
     await tx.delete(question).where(eq(question.surveyId, surveyId))
     if (questionsInput.length > 0) {
       // Build snapshot map for any custom type questions
