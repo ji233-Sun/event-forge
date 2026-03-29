@@ -196,6 +196,16 @@ function SurveyCard({ survey: s }: { survey: SurveyWithCounts }) {
           {status === 'closed' && (
             <>
               <Button variant="outline" size="sm" asChild>
+                <Link href={`/surveys/${s.id}/edit`}>
+                  <IconEdit size={16} />
+                  Edit
+                </Link>
+              </Button>
+              <Button size="sm" onClick={handlePublish} disabled={loading}>
+                {loading ? <IconLoader2 size={16} className="animate-spin" /> : <IconCircleCheck size={16} />}
+                Republish
+              </Button>
+              <Button variant="outline" size="sm" asChild>
                 <Link href={`/surveys/${s.id}`}>
                   <IconChartBar size={16} />
                   Results
