@@ -240,7 +240,6 @@ export function MultimediaResult({
   )
   const [highlightRatioControl, setHighlightRatioControl] = useState(false)
   const [musicPrompt, setMusicPrompt] = useState('')
-  const [withLyrics, setWithLyrics] = useState(false)
   const [soundtrack, setSoundtrack] = useState<Soundtrack | null>(() => getBaseSoundtrack(result))
   const [musicError, setMusicError] = useState('')
   const [isGeneratingMusic, setIsGeneratingMusic] = useState(false)
@@ -311,7 +310,7 @@ export function MultimediaResult({
 
   const hasGeneratedMusic = soundtrack !== null
 
-  const soundtrackTitle = soundtrack?.title ?? (withLyrics ? 'Generated Song' : 'Generated Instrumental')
+  const soundtrackTitle = soundtrack?.title ?? 'Generated Instrumental'
 
   const soundtrackDescription = soundtrack?.description ?? 'Describe the music you want and generate it on demand.'
 
@@ -465,7 +464,7 @@ export function MultimediaResult({
         },
         body: JSON.stringify({
           prompt: musicPrompt.trim() || result.concept.visualDirection,
-          withLyrics,
+          withLyrics: false,
           parentId: parentRecordId ?? undefined,
         }),
       })
@@ -878,33 +877,6 @@ export function MultimediaResult({
                 />
               </div>
 
-              <div className="flex items-center justify-between rounded-md border border-border/80 bg-background/60 px-3 py-2.5">
-                <div>
-                  <p className="text-sm font-medium">Include Lyrics</p>
-                  <p className="text-xs text-muted-foreground">
-                    {withLyrics ? 'AI will write lyrics and generate a song.' : 'Pure instrumental, no vocals.'}
-                  </p>
-                </div>
-                <button
-                  aria-label="Toggle lyrics"
-                  className={cn(
-                    'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-                    withLyrics ? 'bg-primary' : 'bg-input',
-                  )}
-                  disabled={isGeneratingMusic}
-                  onClick={() => setWithLyrics((prev) => !prev)}
-                  role="switch"
-                  aria-checked={withLyrics}
-                  type="button"
-                >
-                  <span
-                    className={cn(
-                      'pointer-events-none block h-5 w-5 rounded-full bg-background shadow-lg ring-0 transition-transform',
-                      withLyrics ? 'translate-x-5' : 'translate-x-0',
-                    )}
-                  />
-                </button>
-              </div>
             </div>
 
             <Button className="mt-4 w-full" disabled={isGeneratingMusic} onClick={handleGenerateMusic} type="button">
