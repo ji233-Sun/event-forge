@@ -74,7 +74,9 @@ AI HOOKS (optional — call inside the component, these are real React hooks):
 - useImageGen()
     → { imageUrl: null|string, isGenerating: boolean, error: null|string, generate(prompt): Promise<null|string> }
     generate() fires the request and ALSO returns the URL as a plain string (or null on error).
+  The URL is an HTTP proxy path (for example /api/media/... or /api/slides/image/...), NOT base64 and NOT a data URL.
     The returned value is a raw string — it has NO properties. Never call .url, .title, .src on it.
+  Never parse imageUrl as base64 and never do Buffer.from(imageUrl, 'base64').
     Read the image from the hook's imageUrl state, not from the generate() return value.
     CORRECT pattern:
       const { imageUrl, isGenerating, generate } = useImageGen()
@@ -84,6 +86,7 @@ AI HOOKS (optional — call inside the component, these are real React hooks):
       const result = await generate(prompt)
       setUrl(result.url)    // CRASH: result is a string, not {url:...}
       setUrl(result.title)  // CRASH: result is a string, not {title:...}
+      Buffer.from(result, 'base64') // WRONG: result is a URL string, not base64 data
 
 - useMusicGen()
     → { audioUrl: null|string, isGenerating: boolean, error: null|string, generate(params): Promise<null|string> }

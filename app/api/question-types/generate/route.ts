@@ -43,6 +43,16 @@ COMPONENT RULES (applies to both formCode and displayCode):
   - ALWAYS guard at the top: if (!answer) return <p className="text-sm text-muted-foreground">No answer yet.</p>
   - render it clearly for statistics/results
 
+FORM VS DISPLAY BEHAVIOR — MANDATORY:
+- formCode is for the survey answering screen. It MUST be fully interactive and include clear user feedback.
+  - Include complete input flow: editable controls, state updates, and onChange calls whenever the answer changes.
+  - Include visible feedback states such as loading/submitted/error/pending when relevant.
+  - The participant should understand what happened after each action.
+- displayCode is for the data/results screen. It MUST be a static read-only view.
+  - Do NOT include input controls, submit buttons, upload triggers, chat send actions, or any onChange calls.
+  - Do NOT mutate data in displayCode. No answer editing, no save actions.
+  - Only present existing answer data (or "No answer yet") with clear visual formatting.
+
 NULL SAFETY — MANDATORY:
 Every prop and AI hook state starts as null/undefined. Accessing any property without a guard is a runtime crash.
 
@@ -71,7 +81,9 @@ AI hooks (call inside the component — these are real React hooks):
   - useImageGen()
       → { imageUrl: null|string, isGenerating: boolean, error: null|string, generate(prompt): Promise<null|string> }
       generate() fires the request and ALSO returns the URL as a plain string (or null on error).
+      The URL is an HTTP proxy path (for example /api/media/... or /api/slides/image/...), NOT base64 and NOT a data URL.
       The returned value is a raw string — it has NO properties. Never call .url, .title, .src on it.
+      Never parse imageUrl as base64 and never do Buffer.from(imageUrl, 'base64').
       Read the image from the hook's imageUrl state, not from the generate() return value.
       CORRECT pattern:
         const { imageUrl, isGenerating, generate } = useImageGen()
@@ -81,6 +93,7 @@ AI hooks (call inside the component — these are real React hooks):
         const result = await generate(prompt)
         setUrl(result.url)    // CRASH: result is a string, not {url:...}
         setUrl(result.title)  // CRASH: result is a string, not {title:...}
+        Buffer.from(result, 'base64') // WRONG: result is a URL string, not base64 data
 
   - useMusicGen()
       → { audioUrl: null|string, isGenerating: boolean, error: null|string, generate(params): Promise<null|string> }

@@ -32,6 +32,9 @@ COMMON FIXES:
 - result.title / .url on a generate() return value → generate() returns a plain string, not an object
   BAD:  const r = await generate(p); setUrl(r.title)
   GOOD: await generate(p)   — then read the hook state: imageUrl / audioUrl / fileUrl
+  NOTE: imageUrl/audioUrl/fileUrl are URL strings (usually /api/media/... or /api/slides/image/...), not base64 data URLs.
+  BAD:  Buffer.from(imageUrl, 'base64')
+  GOOD: use directly in JSX: {imageUrl && <img src={imageUrl} alt="generated" />}
 
 - SyntaxError (unexpected token) → strip TypeScript syntax
   Remove: type annotations, generic parameters, as-casts, interface/type declarations

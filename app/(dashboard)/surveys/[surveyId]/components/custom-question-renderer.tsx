@@ -15,15 +15,17 @@ type Props = {
   onFixed?: (fixedCode: string) => void
 }
 
-// Ensure noInline code always ends with a render() call.
-// The AI system prompt instructs models to include it, but sometimes they omit it.
+// Always use a controlled render() call to avoid AI-generated mismatches
+// (e.g. render(<Component />) without required props like onChange).
 function ensureRenderCall(code: string, mode: 'form' | 'display'): string {
-  if (/render\s*\(/.test(code)) return code
   const renderCall =
     mode === 'form'
       ? 'render(<Component value={value} onChange={onChange} question={question} />)'
       : 'render(<Display answer={answer} />)'
-  return `${code}\n${renderCall}`
+
+  // Drop trailing render(...) calls from generated code so we can inject a safe one.
+  const withoutTrailingRender = code.replace(/\n?\s*render\s*\([\s\S]*?\)\s*;?\s*$/m, '').trimEnd()
+  return `${withoutTrailingRender}\n${renderCall}`
 }
 
 // Strip import/export statements that the AI may include despite instructions.
