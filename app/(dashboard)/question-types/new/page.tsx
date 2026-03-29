@@ -1,105 +1,300 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import {
+  IconAlertCircle,
+  IconArrowLeft,
+  IconCheck,
+  IconCode,
+  IconCopy,
+  IconDeviceDesktop,
+  IconLoader2,
+  IconRefresh,
+  IconRobot,
+  IconWand,
+} from '@tabler/icons-react'
+
+import { AgentModeSwitch } from '@/components/agent-task/agent-mode-switch'
+import { AgentTaskWizard } from '@/components/agent-task/agent-task-wizard'
+import { CustomQuestionRenderer } from '@/app/(dashboard)/surveys/[surveyId]/components/custom-question-renderer'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { 
-  IconLoader2, 
-  IconWand, 
-  IconCheck, 
-  IconArrowLeft, 
-  IconEye, 
-  IconDeviceDesktop, 
-  IconCode,
-  IconSparkles,
-  IconAlertCircle
-} from '@tabler/icons-react'
-import Link from 'next/link'
-import { CustomQuestionRenderer } from '@/app/(dashboard)/surveys/[surveyId]/components/custom-question-renderer'
-import { createCustomType, getCustomTypeById, updateCustomType } from '../actions'
+import { Textarea } from '@/components/ui/textarea'
+import type { CreationMode } from '@/lib/agent-tasks/types'
 import type { GenerateCustomTypeResult } from '@/lib/question-runtime/types'
-import { cn } from '@/lib/utils'
+
+import { createCustomType, getCustomTypeById, updateCustomType } from '../actions'
 import {
   buildQuestionTypeSaveRequest,
   getQuestionTypeEditorState,
   toEditableQuestionTypeResult,
 } from './editor-state'
+import { cn } from '@/lib/utils'
+
+type AgentTaskSession = {
+  taskId: string
+  turnId: string
+  instructions: string
+  skillUrl: string
+  tokenExpiresAt: string | null
+  status: 'waiting' | 'draft_ready' | 'expired'
+}
+
+type AgentTaskCreatePayload = {
+  turnKind?: 'create' | 'iterate'
+  feedback?: string
+}
+
+function getInitialMode(searchParams: ReturnType<typeof useSearchParams>): CreationMode {
+  return searchParams.get('mode') === 'agent' ? 'my_agent' : 'built_in_ai'
+}
 
 export default function NewQuestionTypePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const editId = searchParams.get('id')
 
+  const [mode, setMode] = useState<CreationMode>(getInitialMode(searchParams))
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isIterating, setIsIterating] = useState(false)
+  const [isIssuingAgentTask, setIsIssuingAgentTask] = useState(false)
+  const [isCancellingAgentTask, setIsCancellingAgentTask] = useState(false)
   const [result, setResult] = useState<GenerateCustomTypeResult | null>(null)
+  const [taskState, setTaskState] = useState<AgentTaskSession | null>(null)
   const [iterationFeedback, setIterationFeedback] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [previewValue, setPreviewValue] = useState<unknown>(undefined)
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
-  const editorState = getQuestionTypeEditorState({ editId, result })
 
-  // Load existing type for editing
+  const editorState = getQuestionTypeEditorState({ editId, result, mode })
+  const hasUnsavedAgentDraft = mode === 'my_agent' && taskState?.status === 'draft_ready'
+  const canShowSaveAction = mode === 'built_in_ai' ? !!result : hasUnsavedAgentDraft
+  const disableModeSwitch = !!result || !!taskState || isGenerating || isIterating || isSaving
+
+  const previewBadge = useMemo(() => {
+    if (mode === 'my_agent') {
+      if (taskState?.status === 'waiting') {
+        return {
+          label: 'Waiting for agent draft',
+          className: 'border-amber-200 bg-amber-500/5 text-amber-700',
+        }
+      }
+      if (taskState?.status === 'expired') {
+        return {
+          label: 'Token expired',
+          className: 'border-destructive/20 bg-destructive/10 text-destructive',
+        }
+      }
+      if (taskState?.status === 'draft_ready') {
+        return {
+          label: 'Draft ready to save',
+          className: 'border-green-200 bg-green-500/5 text-green-600',
+        }
+      }
+    }
+
+    return {
+      label: 'Ready for review',
+      className: 'border-green-200 bg-green-500/5 text-green-600',
+    }
+  }, [mode, taskState?.status])
+
   useEffect(() => {
-    if (editId) {
-      getCustomTypeById(editId).then((type) => {
-        if (type) {
-          setPrompt(type.prompt)
-          setName(type.name)
-          setResult(toEditableQuestionTypeResult({
-            name: type.name,
-            formCode: type.formCode,
-            displayCode: type.displayCode,
-            answerSchema: type.answerSchema as GenerateCustomTypeResult['answerSchema'],
-          }))
+    if (!editId) {
+      setMode(getInitialMode(searchParams))
+      return
+    }
+
+    getCustomTypeById(editId).then((type) => {
+      if (!type) {
+        setError('Question type not found.')
+        return
+      }
+
+      setPrompt(type.prompt)
+      setName(type.name)
+      setMode(type.creationMode ?? 'built_in_ai')
+      setResult(
+        toEditableQuestionTypeResult({
+          name: type.name,
+          formCode: type.formCode,
+          displayCode: type.displayCode,
+          answerSchema: type.answerSchema as GenerateCustomTypeResult['answerSchema'],
+        }),
+      )
+    })
+  }, [editId, searchParams])
+
+  useEffect(() => {
+    if (mode !== 'my_agent' || !taskState?.taskId || taskState.status !== 'waiting') {
+      return
+    }
+
+    let cancelled = false
+
+    async function pollTask() {
+      try {
+        const response = await fetch(`/api/agent-tasks/${taskState.taskId}`)
+        if (!response.ok) {
           return
         }
 
-        setError('Question type not found.')
-      })
+        const data = (await response.json()) as {
+          latestDraft?: GenerateCustomTypeResult | null
+        }
+
+        if (cancelled || !data.latestDraft) {
+          return
+        }
+
+        setResult(data.latestDraft)
+        setName(data.latestDraft.suggestedName)
+        setTaskState((current) =>
+          current ? { ...current, status: 'draft_ready' } : current,
+        )
+      } catch {
+        // Ignore transient polling failures and wait for the next cycle.
+      }
     }
-  }, [editId])
+
+    void pollTask()
+    const intervalId = window.setInterval(() => {
+      void pollTask()
+    }, 4_000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [mode, taskState?.taskId, taskState?.status])
+
+  useEffect(() => {
+    if (!taskState?.tokenExpiresAt || taskState.status !== 'waiting') {
+      return
+    }
+
+    const expiresAt = new Date(taskState.tokenExpiresAt).getTime()
+    const timeoutMs = Math.max(expiresAt - Date.now(), 0)
+
+    const timeoutId = window.setTimeout(() => {
+      setTaskState((current) => {
+        if (!current || current.status !== 'waiting') {
+          return current
+        }
+
+        return { ...current, status: 'expired' }
+      })
+    }, timeoutMs)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [taskState?.tokenExpiresAt, taskState?.status])
+
+  async function createAgentTask(payload: AgentTaskCreatePayload = {}) {
+    const response = await fetch('/api/agent-tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        resourceKind: 'question_type',
+        prompt,
+        existingEntityId: editId,
+        currentDraft: result,
+        turnKind: payload.turnKind ?? 'create',
+        feedback: payload.feedback ?? null,
+      }),
+    })
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(
+        typeof data?.error === 'string' ? data.error : 'Unable to prepare the agent task.',
+      )
+    }
+
+    setTaskState({
+      taskId: data.taskId as string,
+      turnId: data.turnId as string,
+      instructions: data.agentInstructions as string,
+      skillUrl: data.skillUrl as string,
+      tokenExpiresAt: (data.tokenExpiresAt as string | null) ?? null,
+      status: 'waiting',
+    })
+  }
+
+  async function createAgentIterateTurn() {
+    if (!taskState?.taskId) {
+      throw new Error('Prepare the agent task before requesting an iteration.')
+    }
+
+    const response = await fetch(`/api/agent-tasks/${taskState.taskId}/turns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feedback: iterationFeedback.trim() }),
+    })
+    const data = await response.json()
+
+    if (!response.ok) {
+      throw new Error(
+        typeof data?.error === 'string' ? data.error : 'Unable to create the iterate turn.',
+      )
+    }
+
+    setTaskState({
+      taskId: data.taskId as string,
+      turnId: data.turnId as string,
+      instructions: data.agentInstructions as string,
+      skillUrl: data.skillUrl as string,
+      tokenExpiresAt: (data.tokenExpiresAt as string | null) ?? null,
+      status: 'waiting',
+    })
+  }
 
   async function handleGenerate() {
-    if (!prompt.trim()) return
+    if (!prompt.trim()) {
+      return
+    }
+
     setIsGenerating(true)
     setError('')
-    // Keep old result while generating for smoother transition or clear it? 
-    // Let's clear it to show the loading state clearly
     setResult(null)
 
     try {
-      const res = await fetch('/api/question-types/generate', {
+      const response = await fetch('/api/question-types/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error)
+      }
+
       setResult(data as GenerateCustomTypeResult)
-      setName(data.suggestedName)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Generation failed.')
+      setName((data as GenerateCustomTypeResult).suggestedName)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Generation failed.')
     } finally {
       setIsGenerating(false)
     }
   }
 
   async function handleIterate() {
-    if (!result || !iterationFeedback.trim()) return
+    if (!result || !iterationFeedback.trim()) {
+      return
+    }
+
     setIsIterating(true)
     setError('')
 
     try {
-      const res = await fetch('/api/question-types/iterate', {
+      const response = await fetch('/api/question-types/iterate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -108,22 +303,153 @@ export default function NewQuestionTypePage() {
           currentResult: result,
         }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error)
+      }
+
       setResult(data as GenerateCustomTypeResult)
-      setName(data.suggestedName)
+      setName((data as GenerateCustomTypeResult).suggestedName)
       setIterationFeedback('')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Iteration failed.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Iteration failed.')
     } finally {
       setIsIterating(false)
     }
   }
 
-  async function handleSave() {
-    if (!result || !name.trim()) return
-    setIsSaving(true)
+  async function handlePrepareAgentTask() {
+    if (!prompt.trim()) {
+      return
+    }
+
+    setIsIssuingAgentTask(true)
+    setError('')
+
     try {
+      await createAgentTask()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to prepare the agent task.')
+    } finally {
+      setIsIssuingAgentTask(false)
+    }
+  }
+
+  async function handleAgentIterate() {
+    if (!iterationFeedback.trim()) {
+      return
+    }
+
+    setIsIterating(true)
+    setError('')
+
+    try {
+      if (taskState?.taskId) {
+        await createAgentIterateTurn()
+      } else {
+        await createAgentTask({
+          turnKind: 'iterate',
+          feedback: iterationFeedback.trim(),
+        })
+      }
+
+      setIterationFeedback('')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to request the iteration.')
+    } finally {
+      setIsIterating(false)
+    }
+  }
+
+  async function handleCopyInstructions() {
+    if (!taskState?.instructions) {
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(taskState.instructions)
+    } catch {
+      setError('Unable to copy the agent instructions.')
+    }
+  }
+
+  async function handleCancelAgentTask() {
+    if (!taskState?.taskId) {
+      return
+    }
+
+    setIsCancellingAgentTask(true)
+    setError('')
+
+    try {
+      const response = await fetch(`/api/agent-tasks/${taskState.taskId}/cancel`, {
+        method: 'POST',
+      })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error)
+      }
+
+      setTaskState(null)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to cancel the agent task.')
+    } finally {
+      setIsCancellingAgentTask(false)
+    }
+  }
+
+  async function handleRefreshTask() {
+    if (!taskState?.taskId) {
+      return
+    }
+
+    setError('')
+
+    try {
+      const response = await fetch(`/api/agent-tasks/${taskState.taskId}`)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error)
+      }
+
+      if (data.latestDraft) {
+        const draft = data.latestDraft as GenerateCustomTypeResult
+        setResult(draft)
+        setName(draft.suggestedName)
+        setTaskState((current) =>
+          current ? { ...current, status: 'draft_ready' } : current,
+        )
+      }
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to refresh the task state.')
+    }
+  }
+
+  async function handleSave() {
+    if (!result || !name.trim()) {
+      return
+    }
+
+    setIsSaving(true)
+
+    try {
+      if (mode === 'my_agent') {
+        if (!taskState?.taskId || taskState.status !== 'draft_ready') {
+          throw new Error('Wait for a draft from your agent before saving.')
+        }
+
+        const response = await fetch(`/api/agent-tasks/${taskState.taskId}/save`, {
+          method: 'POST',
+        })
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error)
+        }
+
+        router.push(data.redirectTo as string)
+        return
+      }
+
       const request = buildQuestionTypeSaveRequest({
         editId,
         name: name.trim(),
@@ -138,300 +464,470 @@ export default function NewQuestionTypePage() {
       }
 
       router.push('/question-types')
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed.')
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Save failed.')
       setIsSaving(false)
     }
   }
 
-  return (
-    <div className="min-h-full bg-background/50">
-      <div className="mx-auto max-w-7xl px-6 py-10">
-        {/* Breadcrumbs & Header */}
-        <div className="mb-10 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" asChild className="rounded-full transition-transform hover:-translate-x-0.5">
-              <Link href="/question-types">
-                <IconArrowLeft size={20} />
-              </Link>
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                {editorState.title}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {editorState.description}
-              </p>
-            </div>
-          </div>
-          {editorState.showSaveAction && (
-            <Button onClick={handleSave} disabled={!name.trim() || isSaving || isIterating} className="h-10 px-6">
-              {isSaving ? (
-                <>
-                  <IconLoader2 size={18} className="mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <IconCheck size={18} className="mr-2" />
-                  {editorState.saveLabel}
-                </>
-              )}
-            </Button>
-          )}
+  const headerActions = canShowSaveAction ? (
+    <Button
+      onClick={handleSave}
+      disabled={!name.trim() || isSaving || isIterating || isIssuingAgentTask}
+      className="h-10 px-6"
+    >
+      {isSaving ? (
+        <>
+          <IconLoader2 size={18} className="mr-2 animate-spin" />
+          Saving...
+        </>
+      ) : (
+        <>
+          <IconCheck size={18} className="mr-2" />
+          {editorState.saveLabel}
+        </>
+      )}
+    </Button>
+  ) : null
+
+  const modeSwitch = (
+    <AgentModeSwitch
+      value={mode}
+      resourceKind="question_type"
+      disabled={disableModeSwitch}
+      onValueChange={setMode}
+    />
+  )
+
+  const promptSection = (
+    <Card className="overflow-hidden border-border/40 shadow-sm">
+      <CardHeader className="bg-muted/30 pb-4">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          1. Prompt
+        </CardTitle>
+        <CardDescription>
+          {mode === 'my_agent'
+            ? 'Define the brief that your external agent should implement.'
+            : 'Describe the first draft you want EventForge to generate.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-6">
+        <div className="space-y-2">
+          <Label htmlFor="prompt" className="text-sm font-medium">
+            {editorState.promptLabel}
+          </Label>
+          <Textarea
+            id="prompt"
+            placeholder={editorState.promptPlaceholder}
+            value={prompt}
+            onChange={(event) => setPrompt(event.target.value)}
+            readOnly={editorState.isPromptLocked}
+            className={cn(
+              'min-h-[160px] resize-none border-border/60 bg-background focus:ring-primary/20',
+              editorState.isPromptLocked && 'bg-muted/50',
+            )}
+          />
         </div>
 
-        <div className="grid gap-8 lg:grid-cols-12">
-          {/* Left Column: Input & Controls */}
-          <div className="space-y-6 lg:col-span-5">
-            <Card className="overflow-hidden border-border/40 shadow-sm transition-shadow hover:shadow-md">
-              <CardHeader className="bg-muted/30 pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    1. The Prompt
-                  </CardTitle>
-                  <IconSparkles size={16} className="text-primary/60" />
+        {editorState.isPromptLocked ? (
+          <p className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            {editorState.lockedPromptMessage}
+          </p>
+        ) : null}
+
+        {mode === 'built_in_ai' && !editorState.isPromptLocked ? (
+          <Button
+            onClick={handleGenerate}
+            disabled={!prompt.trim() || isGenerating}
+            className="w-full shadow-lg shadow-primary/10 transition-all active:scale-[0.98]"
+          >
+            {isGenerating ? (
+              <>
+                <IconLoader2 size={18} className="mr-2 animate-spin" />
+                Generating Component...
+              </>
+            ) : (
+              <>
+                <IconWand size={18} className="mr-2" />
+                Generate with AI
+              </>
+            )}
+          </Button>
+        ) : null}
+
+        {error ? (
+          <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
+            <IconAlertCircle size={14} />
+            {error}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  )
+
+  const agentSection = (
+    <Card className="overflow-hidden border-border/40 shadow-sm">
+      <CardHeader className="bg-muted/30 pb-4">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          2. Agent Task
+        </CardTitle>
+        <CardDescription>
+          Share the skill, task brief, and one-time token with your own agent.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-6">
+        <div className="rounded-xl border border-border/50 bg-muted/20 p-4">
+          <p className="text-sm font-medium">Shared skill</p>
+          <a
+            href={taskState?.skillUrl ?? '/eventforge-skill.md'}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 inline-flex text-xs font-medium text-primary transition-colors hover:text-primary/80"
+          >
+            {taskState?.skillUrl ?? '/eventforge-skill.md'}
+          </a>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-border/50 bg-background/80 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Task ID</p>
+            <p className="mt-1 text-sm font-medium">
+              {taskState?.taskId ?? 'Create the task to get an ID'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-border/50 bg-background/80 p-4">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Token expires</p>
+            <p className="mt-1 text-sm font-medium">
+              {taskState?.tokenExpiresAt
+                ? new Date(taskState.tokenExpiresAt).toLocaleString()
+                : 'Not issued yet'}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <Label htmlFor="agent-instructions" className="text-sm font-medium">
+              Agent Instructions
+            </Label>
+            <Badge variant="outline" className={cn('border-border/60', previewBadge.className)}>
+              {taskState?.status === 'draft_ready'
+                ? 'Draft ready'
+                : taskState?.status === 'expired'
+                  ? 'Expired'
+                  : taskState?.status === 'waiting'
+                    ? 'Waiting'
+                    : 'Not issued'}
+            </Badge>
+          </div>
+          <Textarea
+            id="agent-instructions"
+            readOnly
+            value={
+              taskState?.instructions ??
+              'Prepare the task to get a ready-to-copy instruction block for your external agent.'
+            }
+            className="min-h-[220px] resize-none border-border/60 bg-background font-mono text-xs"
+          />
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Button
+            type="button"
+            onClick={handlePrepareAgentTask}
+            disabled={!prompt.trim() || isIssuingAgentTask || isSaving || isIterating}
+            className="w-full"
+          >
+            {isIssuingAgentTask ? (
+              <>
+                <IconLoader2 size={18} className="mr-2 animate-spin" />
+                Preparing...
+              </>
+            ) : (
+              <>
+                <IconRobot size={18} className="mr-2" />
+                {taskState ? 'Reissue Create Turn' : 'Prepare Agent Task'}
+              </>
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCopyInstructions}
+            disabled={!taskState?.instructions}
+            className="w-full"
+          >
+            <IconCopy size={18} className="mr-2" />
+            Copy Instructions
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleRefreshTask}
+            disabled={!taskState?.taskId}
+            className="w-full"
+          >
+            <IconRefresh size={18} className="mr-2" />
+            Refresh Status
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleCancelAgentTask}
+            disabled={!taskState?.taskId || isCancellingAgentTask}
+            className="w-full"
+          >
+            {isCancellingAgentTask ? (
+              <>
+                <IconLoader2 size={18} className="mr-2 animate-spin" />
+                Cancelling...
+              </>
+            ) : (
+              'Cancel Task'
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+
+  const iterateSection = result ? (
+    <Card className="overflow-hidden border-border/40 shadow-sm">
+      <CardHeader className="bg-muted/30 pb-4">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          {mode === 'my_agent' ? '3. Iterate' : '2. Iterate'}
+        </CardTitle>
+        <CardDescription>
+          Describe bugs, UX issues, or follow-up improvements for the current draft.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-6">
+        <div className="space-y-2">
+          <Label htmlFor="iteration-feedback" className="text-sm font-medium">
+            What should change in the current result?
+          </Label>
+          <Textarea
+            id="iteration-feedback"
+            placeholder="e.g. Fix the mobile spacing bug, add a clearer success state, and make the comment box optional."
+            value={iterationFeedback}
+            onChange={(event) => setIterationFeedback(event.target.value)}
+            className="min-h-[140px] resize-none border-border/60 bg-background focus:ring-primary/20"
+          />
+        </div>
+        <Button
+          onClick={mode === 'my_agent' ? handleAgentIterate : handleIterate}
+          disabled={!iterationFeedback.trim() || isIterating || isSaving || isIssuingAgentTask}
+          className="w-full shadow-lg shadow-primary/10 transition-all active:scale-[0.98]"
+        >
+          {isIterating ? (
+            <>
+              <IconLoader2 size={18} className="mr-2 animate-spin" />
+              {mode === 'my_agent' ? 'Preparing Iterate Turn...' : 'Applying Iteration...'}
+            </>
+          ) : (
+            <>
+              <IconWand size={18} className="mr-2" />
+              {mode === 'my_agent' ? 'Send Iteration to My Agent' : 'Refine Current Result'}
+            </>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  ) : null
+
+  const identitySection = result ? (
+    <Card className="overflow-hidden border-border/40 shadow-sm">
+      <CardHeader className="bg-muted/30 pb-4">
+        <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+          {editorState.identityStepTitle}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <div className="space-y-2">
+          <Label htmlFor="name" className="text-sm font-medium">
+            {editorState.identityLabel}
+          </Label>
+          <Input
+            id="name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder={editorState.identityPlaceholder}
+            className="border-border/60 bg-background focus:ring-primary/20"
+          />
+        </div>
+      </CardContent>
+    </Card>
+  ) : null
+
+  const previewSection =
+    mode === 'built_in_ai' && isGenerating ? (
+      <div className="flex min-h-[500px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-card/30 p-12 text-center">
+        <div className="relative mb-6">
+          <div className="absolute inset-0 animate-ping rounded-full bg-primary/20" />
+          <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <IconWand size={32} />
+          </div>
+        </div>
+        <h3 className="text-lg font-semibold">AI is building your component</h3>
+        <p className="mt-2 max-w-[280px] text-sm text-muted-foreground">
+          Crafting the UI, logic, and schema based on your description...
+        </p>
+      </div>
+    ) : mode === 'my_agent' && taskState?.status === 'waiting' && !result ? (
+      <div className="flex min-h-[500px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-card/30 p-12 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <IconRobot size={32} />
+        </div>
+        <h3 className="mt-6 text-lg font-semibold">Waiting for your agent</h3>
+        <p className="mt-2 max-w-[320px] text-sm text-muted-foreground">
+          The preview will update automatically after your external agent submits a valid draft.
+        </p>
+      </div>
+    ) : result ? (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1 rounded-lg border border-border/40 bg-muted/30 p-1">
+            <Button
+              variant={activeTab === 'preview' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('preview')}
+              className="h-8 gap-1.5 px-3 text-xs"
+            >
+              <IconDeviceDesktop size={14} />
+              Preview
+            </Button>
+            <Button
+              variant={activeTab === 'code' ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setActiveTab('code')}
+              className="h-8 gap-1.5 px-3 text-xs"
+            >
+              <IconCode size={14} />
+              Schema
+            </Button>
+          </div>
+          <Badge variant="outline" className={previewBadge.className}>
+            {previewBadge.label}
+          </Badge>
+        </div>
+
+        {activeTab === 'preview' ? (
+          <div className="grid gap-6">
+            <Card className="overflow-hidden border-border/40 shadow-xl shadow-black/5">
+              <div className="flex items-center justify-between border-b border-border/40 bg-muted/20 px-4 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Interactive Form
+                </span>
+                <div className="flex gap-1">
+                  <div className="h-2 w-2 rounded-full bg-border" />
+                  <div className="h-2 w-2 rounded-full bg-border" />
+                  <div className="h-2 w-2 rounded-full bg-border" />
                 </div>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="prompt" className="text-sm font-medium">What should this question collect?</Label>
-                    <Textarea
-                      id="prompt"
-                      placeholder="e.g. A visual slider for rating energy levels with a comment box..."
-                      value={prompt}
-                      onChange={(e) => setPrompt(e.target.value)}
-                      readOnly={editorState.isPromptLocked}
-                      className={cn(
-                        "min-h-[160px] resize-none border-border/60 bg-background focus:ring-primary/20",
-                        editorState.isPromptLocked && "bg-muted/50"
-                      )}
-                    />
-                  </div>
-                  {editorState.isPromptLocked ? (
-                    <p className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                      {editorState.lockedPromptMessage}
-                    </p>
-                  ) : (
-                    <Button 
-                      onClick={handleGenerate} 
-                      disabled={!prompt.trim() || isGenerating}
-                      className="w-full shadow-lg shadow-primary/10 transition-all active:scale-[0.98]"
-                    >
-                      {isGenerating ? (
-                        <>
-                          <IconLoader2 size={18} className="mr-2 animate-spin" />
-                          Generating Component...
-                        </>
-                      ) : (
-                        <>
-                          <IconWand size={18} className="mr-2" />
-                          {result ? 'Refine with AI' : 'Generate with AI'}
-                        </>
-                      )}
-                    </Button>
-                  )}
-                  {error && (
-                    <div className="flex items-center gap-2 rounded-lg bg-destructive/10 p-3 text-xs text-destructive">
-                      <IconAlertCircle size={14} />
-                      {error}
-                    </div>
-                  )}
-                </div>
+              </div>
+              <CardContent className="p-8">
+                <CustomQuestionRenderer
+                  code={result.formCode}
+                  mode="form"
+                  value={previewValue}
+                  onChange={setPreviewValue}
+                  question={{
+                    title: 'Preview Question',
+                    description: 'Test the interactivity below',
+                  }}
+                  onFixed={(fixedCode) =>
+                    setResult((current) =>
+                      current ? { ...current, formCode: fixedCode } : current,
+                    )
+                  }
+                />
               </CardContent>
             </Card>
 
-            {editorState.showIterateSection && (
-              <Card className="overflow-hidden border-border/40 shadow-sm transition-shadow hover:shadow-md">
-                <CardHeader className="bg-muted/30 pb-4">
-                  <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    2. Iterate the Result
-                  </CardTitle>
-                  <CardDescription>
-                    Describe bugs, UX issues, or feature improvements for the generated output.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="iteration-feedback" className="text-sm font-medium">
-                        What should change in the current result?
-                      </Label>
-                      <Textarea
-                        id="iteration-feedback"
-                        placeholder="e.g. Fix the mobile spacing bug, add a clearer success state, and make the comment box optional."
-                        value={iterationFeedback}
-                        onChange={(e) => setIterationFeedback(e.target.value)}
-                        className="min-h-[140px] resize-none border-border/60 bg-background focus:ring-primary/20"
-                      />
-                    </div>
-                    <Button
-                      onClick={handleIterate}
-                      disabled={!iterationFeedback.trim() || isIterating || isSaving}
-                      className="w-full shadow-lg shadow-primary/10 transition-all active:scale-[0.98]"
-                    >
-                      {isIterating ? (
-                        <>
-                          <IconLoader2 size={18} className="mr-2 animate-spin" />
-                          Applying Iteration...
-                        </>
-                      ) : (
-                        <>
-                          <IconWand size={18} className="mr-2" />
-                          Refine Current Result
-                        </>
-                      )}
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {result && (
-              <Card className="overflow-hidden border-border/40 shadow-sm transition-shadow hover:shadow-md">
-                <CardHeader className="bg-muted/30 pb-4">
-                  <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    {editorState.identityStepTitle}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="name" className="text-sm font-medium">Type Name</Label>
-                      <Input
-                        id="name"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Energy Rating Slider"
-                        className="border-border/60 bg-background focus:ring-primary/20"
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+            <Card className="overflow-hidden border-border/40 shadow-lg shadow-black/5">
+              <div className="border-b border-border/40 bg-muted/20 px-4 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  Result Display
+                </span>
+              </div>
+              <CardContent className="p-8">
+                <div className="rounded-xl border border-dashed border-border/60 bg-muted/5 p-6">
+                  <CustomQuestionRenderer
+                    code={result.displayCode}
+                    mode="display"
+                    answer={previewValue}
+                    onFixed={(fixedCode) =>
+                      setResult((current) =>
+                        current ? { ...current, displayCode: fixedCode } : current,
+                      )
+                    }
+                  />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-
-          {/* Right Column: Preview Area */}
-          <div className="lg:col-span-7">
-            {isGenerating ? (
-              <div className="flex min-h-[500px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-card/30 p-12 text-center">
-                <div className="relative mb-6">
-                  <div className="absolute inset-0 animate-ping rounded-full bg-primary/20"></div>
-                  <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <IconWand size={32} />
-                  </div>
-                </div>
-                <h3 className="text-lg font-semibold">AI is building your component</h3>
-                <p className="mt-2 max-w-[280px] text-sm text-muted-foreground">
-                  Crafting the UI, logic, and schema based on your description...
-                </p>
-                <div className="mt-8 w-full max-w-[200px] space-y-2">
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-primary/10">
-                    <div className="h-full w-1/3 animate-progress rounded-full bg-primary"></div>
-                  </div>
-                </div>
-              </div>
-            ) : result ? (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1 rounded-lg border border-border/40 bg-muted/30 p-1">
-                    <Button 
-                      variant={activeTab === 'preview' ? 'secondary' : 'ghost'} 
-                      size="sm" 
-                      onClick={() => setActiveTab('preview')}
-                      className="h-8 gap-1.5 px-3 text-xs"
-                    >
-                      <IconDeviceDesktop size={14} />
-                      Preview
-                    </Button>
-                    <Button 
-                      variant={activeTab === 'code' ? 'secondary' : 'ghost'} 
-                      size="sm" 
-                      onClick={() => setActiveTab('code')}
-                      className="h-8 gap-1.5 px-3 text-xs"
-                    >
-                      <IconCode size={14} />
-                      Schema
-                    </Button>
-                  </div>
-                  <Badge variant="outline" className="bg-green-500/5 text-green-600 border-green-200">
-                    Ready for use
-                  </Badge>
-                </div>
-
-                {activeTab === 'preview' ? (
-                  <div className="grid gap-6">
-                    <Card className="border-border/40 shadow-xl shadow-black/5 overflow-hidden">
-                      <div className="flex items-center justify-between border-b border-border/40 bg-muted/20 px-4 py-2">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Interactive Form</span>
-                        <div className="flex gap-1">
-                          <div className="h-2 w-2 rounded-full bg-border"></div>
-                          <div className="h-2 w-2 rounded-full bg-border"></div>
-                          <div className="h-2 w-2 rounded-full bg-border"></div>
-                        </div>
-                      </div>
-                      <CardContent className="p-8">
-                        <CustomQuestionRenderer
-                          code={result.formCode}
-                          mode="form"
-                          value={previewValue}
-                          onChange={setPreviewValue}
-                          question={{ title: 'Preview Question', description: 'Test the interactivity below' }}
-                          onFixed={(fixedCode) => setResult((prev) => prev ? { ...prev, formCode: fixedCode } : prev)}
-                        />
-                      </CardContent>
-                    </Card>
-
-                    <Card className="border-border/40 shadow-lg shadow-black/5 overflow-hidden">
-                      <div className="border-b border-border/40 bg-muted/20 px-4 py-2">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Result Display</span>
-                      </div>
-                      <CardContent className="p-8">
-                        <div className="rounded-xl border border-dashed border-border/60 p-6 bg-muted/5">
-                          <CustomQuestionRenderer
-                            code={result.displayCode}
-                            mode="display"
-                            answer={previewValue}
-                            onFixed={(fixedCode) => setResult((prev) => prev ? { ...prev, displayCode: fixedCode } : prev)}
-                          />
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                ) : (
-                  <Card className="border-border/40 shadow-lg shadow-black/5 bg-slate-950 overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
-                      <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">JSON Schema</span>
-                      <Button variant="ghost" size="sm" className="h-7 text-white/60 hover:text-white" onClick={() => {
-                        navigator.clipboard.writeText(JSON.stringify(result.answerSchema, null, 2))
-                      }}>
-                        Copy
-                      </Button>
-                    </div>
-                    <CardContent className="p-0">
-                      <pre className="p-6 text-xs text-indigo-300 overflow-auto max-h-[500px]">
-                        {JSON.stringify(result.answerSchema, null, 2)}
-                      </pre>
-                    </CardContent>
-                  </Card>
-                )}
-              </div>
-            ) : (
-              <div className="flex min-h-[500px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-card/30 p-12 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                  <IconEye size={32} />
-                </div>
-                <h3 className="mt-6 text-lg font-semibold">Live Preview</h3>
-                <p className="mt-2 max-w-[280px] text-sm text-muted-foreground">
-                  Your custom question will appear here as soon as you hit generate.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
+        ) : (
+          <Card className="overflow-hidden border-border/40 bg-slate-950 shadow-lg shadow-black/5">
+            <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-white/40">
+                JSON Schema
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 text-white/60 hover:text-white"
+                onClick={() =>
+                  navigator.clipboard.writeText(
+                    JSON.stringify(result.answerSchema, null, 2),
+                  )
+                }
+              >
+                Copy
+              </Button>
+            </div>
+            <CardContent className="p-0">
+              <pre className="max-h-[500px] overflow-auto p-6 text-xs text-indigo-300">
+                {JSON.stringify(result.answerSchema, null, 2)}
+              </pre>
+            </CardContent>
+          </Card>
+        )}
       </div>
-    </div>
+    ) : (
+      <div className="flex min-h-[500px] flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 bg-card/30 p-12 text-center">
+        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <IconDeviceDesktop size={32} />
+        </div>
+        <h3 className="mt-6 text-lg font-semibold">{editorState.previewEmptyTitle}</h3>
+        <p className="mt-2 max-w-[320px] text-sm text-muted-foreground">
+          {editorState.previewEmptyDescription}
+        </p>
+      </div>
+    )
+
+  return (
+    <AgentTaskWizard
+      state={editorState}
+      headerActions={
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            asChild
+            className="rounded-full transition-transform hover:-translate-x-0.5"
+          >
+            <Link href="/question-types">
+              <IconArrowLeft size={20} />
+            </Link>
+          </Button>
+          {headerActions}
+        </div>
+      }
+      modeSwitch={modeSwitch}
+      promptSection={promptSection}
+      agentSection={agentSection}
+      iterateSection={iterateSection}
+      identitySection={identitySection}
+      previewSection={previewSection}
+    />
   )
 }
