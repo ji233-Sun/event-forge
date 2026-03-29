@@ -258,3 +258,46 @@ export async function getSurveyForFill(surveyIdOrSlug: string) {
     },
   })
 }
+
+// ==================== Response Detail ====================
+
+export async function getResponseById(surveyId: string, responseId: string) {
+  const user = await requireAuth()
+
+  const surveyData = await db.query.survey.findFirst({
+    where: and(eq(survey.id, surveyId), eq(survey.userId, user.id)),
+    columns: { id: true, title: true },
+    with: {
+      questions: { orderBy: (q, { asc }) => asc(q.order) },
+    },
+  })
+
+  if (!surveyData) return null
+
+  const responseData = await db.query.response.findFirst({
+    where: and(eq(response.id, responseId), eq(response.surveyId, surveyId)),
+  })
+
+  if (!responseData) return null
+
+  // Fetch all IDs ordered by createdAt desc to compute prev/next
+  const allIds = await db.query.response.findMany({
+    where: eq(response.surveyId, surveyId),
+    columns: { id: true },
+    orderBy: (r, { desc }) => desc(r.createdAt),
+  })
+
+  const index = allIds.findIndex((r) => r.id === responseId)
+  if (index === -1) return null
+  const prevId = index > 0 ? allIds[index - 1].id : null
+  const nextId = index < allIds.length - 1 ? allIds[index + 1].id : null
+
+  return {
+    response: responseData,
+    survey: { title: surveyData.title },
+    questions: surveyData.questions,
+    prevId,
+    nextId,
+    responseIndex: index + 1,
+  }
+}
