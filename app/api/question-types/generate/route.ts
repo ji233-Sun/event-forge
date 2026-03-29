@@ -38,31 +38,84 @@ Every AI hook returns nullable state that starts as null. Failing to guard is a 
 
 AVAILABLE IN SCOPE:
 React hooks: useState, useEffect, useRef, useCallback, useMemo
-UI: Input, Textarea, Button, Label, Badge, Checkbox, Switch, Separator, Progress, Slider
-Icons: IconPhoto, IconMusic, IconUpload, IconLoader2, IconX, IconPlus, IconCheck, IconStar, IconStarFilled, IconMicrophone, IconFile, IconPlayerPlay, IconPlayerPause
-AI hooks (call these inside the component — they are real React hooks):
-  - useChat(options?: { systemPrompt?: string })
-      → { messages: {role,content}[], send(text: string): Promise<void>, isLoading: boolean }
+shadcn/ui components: Input, Textarea, Button, Label, Badge, Checkbox, Switch, Separator, Progress, Slider
+Icons (@tabler/icons-react): IconPhoto, IconMusic, IconUpload, IconLoader2, IconX, IconPlus, IconCheck, IconStar, IconStarFilled, IconMicrophone, IconFile, IconPlayerPlay, IconPlayerPause
+AI hooks (call inside the component — these are real React hooks):
+  - useChat(options)
+      → { messages: [{role, content}], send(text): Promise<void>, isLoading: boolean }
+      options: { systemPrompt?: string }
   - useImageGen()
-      → { imageUrl: string|null, isGenerating: boolean, error: string|null,
-          generate(prompt: string): Promise<string|null> }
+      → { imageUrl: null|string, isGenerating: boolean, error: null|string, generate(prompt): Promise<null|string> }
       generate() fires the request, sets imageUrl, and returns the URL string (or null on error).
       Do NOT call .title or any property on the return value — it is a plain string or null.
   - useMusicGen()
-      → { audioUrl: string|null, isGenerating: boolean, error: string|null,
-          generate(params: { prompt: string, mood?: string, tempo?: string, instrumentation?: string }): Promise<string|null> }
+      → { audioUrl: null|string, isGenerating: boolean, error: null|string, generate(params): Promise<null|string> }
       generate() fires the request, sets audioUrl, and returns the URL string (or null on error).
       Do NOT call .title or any property on the return value — it is a plain string or null.
+      params: { prompt: string, mood?: string, tempo?: string, instrumentation?: string }
       Minimal correct usage:
         const { audioUrl, isGenerating, error, generate } = useMusicGen()
         // call: await generate({ prompt: 'upbeat pop song for Alice' })
         // render: {audioUrl && <audio controls src={audioUrl} className="w-full mt-2" />}
-  - useFileUpload(options?: { maxMb?: number })
-      → { fileUrl: string|null, isUploading: boolean, error: string|null,
-          upload(file: File): Promise<string|null> }
+  - useFileUpload(options)
+      → { fileUrl: null|string, isUploading: boolean, error: null|string, upload(file): Promise<null|string> }
       upload() fires the request, sets fileUrl, and returns the URL string (or null on error).
+      options: { maxMb?: number }
 
-STYLING: Use Tailwind classes. Use "space-y-3", "flex gap-2", "text-sm text-muted-foreground", etc.
+SYNTAX RULES — MANDATORY (code runs in a browser JS sandbox via react-live/Sucrase):
+The generated code must be valid plain JavaScript + JSX. TypeScript is NOT supported.
+
+FORBIDDEN — will cause SyntaxError:
+- Type annotations:     (p: ParticipantRow) => ...   →  (p) => ...
+- Type assertions:      value as string              →  value
+- Generic parameters:   useState<string[]>([])       →  useState([])
+- Interface/type decls: interface Foo { ... }        →  (omit entirely)
+- Satisfies operator:   obj satisfies Foo            →  obj
+- Logical assignment:   count ??= 0                  →  count = count ?? 0
+
+DESIGN SYSTEM — MANDATORY:
+This project uses shadcn/ui (radix-vega style) with CSS variables. You MUST follow these rules strictly:
+
+1. USE SHADCN COMPONENTS — never use raw <input>, <button>, <textarea> when shadcn equivalents exist:
+   - <Input> not <input>
+   - <Button> not <button> or <a>
+   - <Textarea> not <textarea>
+   - <Label> not <label>
+   - <Badge> for status chips, counts, tags
+   - <Progress> for progress bars
+   - <Slider> for range inputs
+   - <Switch> for toggles
+   - <Checkbox> for checkboxes
+   - <Separator> for dividers
+
+2. BUTTON VARIANTS — choose the right one:
+   - variant="default"     → primary CTA (filled, uses --primary color)
+   - variant="outline"     → secondary action (border only)
+   - variant="ghost"       → subtle, inline action
+   - variant="destructive" → delete / danger
+   - size="sm"             → compact buttons
+   - size="lg"             → prominent CTAs
+
+3. CSS DESIGN TOKENS — ALWAYS use these Tailwind classes for colors, never hardcode hex values:
+   Backgrounds: bg-background, bg-card, bg-muted, bg-muted/50, bg-primary, bg-secondary, bg-destructive/10
+   Text:        text-foreground, text-muted-foreground, text-primary, text-primary-foreground, text-destructive
+   Borders:     border-border, border-input
+
+4. LAYOUT PATTERNS:
+   Vertical stack:   className="flex flex-col gap-4"  (or space-y-3)
+   Horizontal row:   className="flex items-center gap-2"
+   Body text:        className="text-sm text-foreground"
+   Subtle label:     className="text-xs text-muted-foreground"
+
+5. LOADING STATES:
+   - Show <IconLoader2 className="animate-spin" size={16} /> inside a Button when loading
+   - For content areas: <div className="h-8 animate-pulse rounded-md bg-muted" />
+
+6. ICONS — use @tabler/icons-react (size prop, e.g. size={16}), not lucide-react.
+   Always pass size and className: <IconCheck size={16} className="text-primary" />
+   DO NOT use emoji anywhere in the UI. Use icons instead.
+   Emoji are banned in all text content, labels, buttons, headings, and placeholders.
+
 All UI text must be in English.`
 
 export async function POST(request: Request) {
