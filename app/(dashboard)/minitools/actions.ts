@@ -49,6 +49,23 @@ export async function createMinitool(input: {
   return { id }
 }
 
+export async function updateMinitool(input: {
+  id: string
+  name: string
+  componentCode: string
+  hostCode: string
+}) {
+  const user = await requireAuth()
+  await db
+    .update(minitool)
+    .set({
+      name: input.name,
+      componentCode: input.componentCode,
+      hostCode: input.hostCode,
+    })
+    .where(and(eq(minitool.id, input.id), eq(minitool.userId, user.id)))
+}
+
 export async function deleteMinitool(minitoolId: string) {
   const user = await requireAuth()
   await db.delete(minitool).where(

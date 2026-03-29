@@ -13,8 +13,10 @@ import {
   IconCopy,
   IconUsers,
   IconTool,
+  IconPencil,
 } from '@tabler/icons-react'
 import { deleteMinitool, toggleMinitoolPublic } from './actions'
+import { getMinitoolEditorHref } from './editor-link'
 
 type MinitoolItem = {
   id: string
@@ -89,19 +91,30 @@ export function MinitoolList({ initialTools }: { initialTools: MinitoolItem[] })
               </Badge>
             </div>
 
-            <div className="mt-4 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span>Share</span>
+              <div className="mt-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span>Share</span>
                 <Switch
                   checked={tool.isPublic}
                   onCheckedChange={() => handleTogglePublic(tool.id, tool.isPublic)}
                   className="scale-75 origin-left"
                 />
               </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    asChild
+                    title="Edit minitool"
+                  >
+                    <Link href={getMinitoolEditorHref(tool.id)}>
+                      <IconPencil size={14} />
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
                   className="h-7 w-7"
                   onClick={() => copyLink(tool.id)}
                   disabled={!tool.isPublic}

@@ -62,6 +62,25 @@ export async function createCustomType(input: {
   return { id }
 }
 
+export async function updateCustomType(input: {
+  id: string
+  name: string
+  formCode: string
+  displayCode: string
+  answerSchema: AnswerJsonSchema
+}) {
+  const user = await requireAuth()
+  await db
+    .update(customQuestionType)
+    .set({
+      name: input.name,
+      formCode: input.formCode,
+      displayCode: input.displayCode,
+      answerSchema: input.answerSchema,
+    })
+    .where(and(eq(customQuestionType.id, input.id), eq(customQuestionType.userId, user.id)))
+}
+
 export async function deleteCustomType(typeId: string) {
   const user = await requireAuth()
   await db

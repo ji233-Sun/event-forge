@@ -21,9 +21,14 @@ import {
 } from '@tabler/icons-react'
 import Link from 'next/link'
 import { CustomQuestionRenderer } from '@/app/(dashboard)/surveys/[surveyId]/components/custom-question-renderer'
-import { createCustomType, getCustomTypeById } from '../actions'
+import { createCustomType, getCustomTypeById, updateCustomType } from '../actions'
 import type { GenerateCustomTypeResult } from '@/lib/question-runtime/types'
 import { cn } from '@/lib/utils'
+import {
+  buildQuestionTypeSaveRequest,
+  getQuestionTypeEditorState,
+  toEditableQuestionTypeResult,
+} from './editor-state'
 
 export default function NewQuestionTypePage() {
   const router = useRouter()
@@ -40,22 +45,25 @@ export default function NewQuestionTypePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [previewValue, setPreviewValue] = useState<unknown>(undefined)
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview')
-  const isPromptLocked = !!result || !!editId
+  const editorState = getQuestionTypeEditorState({ editId, result })
 
-  // Load existing type if editing/viewing
+  // Load existing type for editing
   useEffect(() => {
     if (editId) {
       getCustomTypeById(editId).then((type) => {
         if (type) {
           setPrompt(type.prompt)
           setName(type.name)
-          setResult({
+          setResult(toEditableQuestionTypeResult({
+            name: type.name,
             formCode: type.formCode,
             displayCode: type.displayCode,
             answerSchema: type.answerSchema as GenerateCustomTypeResult['answerSchema'],
-            suggestedName: type.name,
-          })
+          }))
+          return
         }
+
+        setError('Question type not found.')
       })
     }
   }, [editId])
@@ -116,13 +124,19 @@ export default function NewQuestionTypePage() {
     if (!result || !name.trim()) return
     setIsSaving(true)
     try {
-      await createCustomType({
+      const request = buildQuestionTypeSaveRequest({
+        editId,
         name: name.trim(),
         prompt,
-        formCode: result.formCode,
-        displayCode: result.displayCode,
-        answerSchema: result.answerSchema,
+        result,
       })
+
+      if (request.mode === 'update') {
+        await updateCustomType(request.input)
+      } else {
+        await createCustomType(request.input)
+      }
+
       router.push('/question-types')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed.')
@@ -143,14 +157,14 @@ export default function NewQuestionTypePage() {
             </Button>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">
-                {editId ? 'Question Type Details' : 'Create Question Type'}
+                {editorState.title}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {editId ? 'View your saved custom question type.' : 'Describe your vision, AI handles the rest.'}
+                {editorState.description}
               </p>
             </div>
           </div>
-          {result && !editId && (
+          {editorState.showSaveAction && (
             <Button onClick={handleSave} disabled={!name.trim() || isSaving || isIterating} className="h-10 px-6">
               {isSaving ? (
                 <>
@@ -160,7 +174,7 @@ export default function NewQuestionTypePage() {
               ) : (
                 <>
                   <IconCheck size={18} className="mr-2" />
-                  Save to Library
+                  {editorState.saveLabel}
                 </>
               )}
             </Button>
@@ -188,18 +202,16 @@ export default function NewQuestionTypePage() {
                       placeholder="e.g. A visual slider for rating energy levels with a comment box..."
                       value={prompt}
                       onChange={(e) => setPrompt(e.target.value)}
-                      readOnly={isPromptLocked}
+                      readOnly={editorState.isPromptLocked}
                       className={cn(
                         "min-h-[160px] resize-none border-border/60 bg-background focus:ring-primary/20",
-                        isPromptLocked && "bg-muted/50"
+                        editorState.isPromptLocked && "bg-muted/50"
                       )}
                     />
                   </div>
-                  {isPromptLocked ? (
+                  {editorState.isPromptLocked ? (
                     <p className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                      {editId
-                        ? 'The original prompt is read-only in the saved details view.'
-                        : 'The initial prompt is locked after generation. Use iteration feedback below to request bug fixes or improvements based on the current result.'}
+                      {editorState.lockedPromptMessage}
                     </p>
                   ) : (
                     <Button 
@@ -230,7 +242,7 @@ export default function NewQuestionTypePage() {
               </CardContent>
             </Card>
 
-            {result && !editId && (
+            {editorState.showIterateSection && (
               <Card className="overflow-hidden border-border/40 shadow-sm transition-shadow hover:shadow-md">
                 <CardHeader className="bg-muted/30 pb-4">
                   <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -280,7 +292,7 @@ export default function NewQuestionTypePage() {
               <Card className="overflow-hidden border-border/40 shadow-sm transition-shadow hover:shadow-md">
                 <CardHeader className="bg-muted/30 pb-4">
                   <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    {editId ? '2. Identity' : '3. Identity'}
+                    {editorState.identityStepTitle}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">
@@ -291,12 +303,8 @@ export default function NewQuestionTypePage() {
                         id="name"
                         value={name}
                         onChange={(e) => setName(e.target.value)}
-                        readOnly={!!editId}
                         placeholder="e.g. Energy Rating Slider"
-                        className={cn(
-                          "border-border/60 bg-background focus:ring-primary/20",
-                          editId && "bg-muted/50"
-                        )}
+                        className="border-border/60 bg-background focus:ring-primary/20"
                       />
                     </div>
                   </div>

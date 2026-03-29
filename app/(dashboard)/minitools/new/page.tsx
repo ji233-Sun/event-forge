@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -20,9 +20,14 @@ import {
   IconAlertCircle,
   IconSparkles,
 } from '@tabler/icons-react'
-import { createMinitool } from '../actions'
+import { createMinitool, getMinitoolById, updateMinitool } from '../actions'
 import type { GenerateMinitoolResult } from '@/lib/minitool-runtime/types'
 import { cn } from '@/lib/utils'
+import {
+  buildMinitoolSaveRequest,
+  getMinitoolEditorState,
+  toEditableMinitoolResult,
+} from './editor-state'
 
 const MinitoolRenderer = dynamic(
   () => import('@/components/minitool-renderer').then((m) => m.MinitoolRenderer),
@@ -31,6 +36,8 @@ const MinitoolRenderer = dynamic(
 
 export default function NewMinitoolPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const editId = searchParams.get('id')
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [isIterating, setIsIterating] = useState(false)
@@ -40,7 +47,26 @@ export default function NewMinitoolPage() {
   const [error, setError] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'audience' | 'host'>('audience')
-  const isPromptLocked = !!result
+  const editorState = getMinitoolEditorState({ editId, result })
+
+  useEffect(() => {
+    if (!editId) return
+
+    getMinitoolById(editId).then((tool) => {
+      if (tool) {
+        setPrompt(tool.prompt)
+        setName(tool.name)
+        setResult(toEditableMinitoolResult({
+          name: tool.name,
+          componentCode: tool.componentCode,
+          hostCode: tool.hostCode,
+        }))
+        return
+      }
+
+      setError('Minitool not found.')
+    })
+  }, [editId])
 
   async function handleGenerate() {
     if (!prompt.trim()) return
@@ -95,13 +121,20 @@ export default function NewMinitoolPage() {
     if (!result || !name.trim()) return
     setIsSaving(true)
     try {
-      await createMinitool({
+      const request = buildMinitoolSaveRequest({
+        editId,
         name: name.trim(),
         prompt,
-        componentCode: result.componentCode,
-        hostCode: result.hostCode,
+        result,
       })
-      router.push('/minitools')
+
+      if (request.mode === 'update') {
+        await updateMinitool(request.input)
+        router.push(`/minitools/${editId}`)
+      } else {
+        await createMinitool(request.input)
+        router.push('/minitools')
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Save failed.')
       setIsSaving(false)
@@ -117,16 +150,16 @@ export default function NewMinitoolPage() {
               <Link href="/minitools"><IconArrowLeft size={20} /></Link>
             </Button>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">Create Minitool</h1>
-              <p className="text-sm text-muted-foreground">Describe your tool — AI handles the rest.</p>
+              <h1 className="text-2xl font-bold tracking-tight">{editorState.title}</h1>
+              <p className="text-sm text-muted-foreground">{editorState.description}</p>
             </div>
           </div>
-          {result && (
+          {editorState.showSaveAction && (
             <Button onClick={handleSave} disabled={!name.trim() || isSaving || isIterating} className="h-10 px-6">
               {isSaving ? (
                 <><IconLoader2 size={18} className="mr-2 animate-spin" />Saving...</>
               ) : (
-                <><IconCheck size={18} className="mr-2" />Save Minitool</>
+                <><IconCheck size={18} className="mr-2" />{editorState.saveLabel}</>
               )}
             </Button>
           )}
@@ -152,16 +185,16 @@ export default function NewMinitoolPage() {
                     placeholder="e.g. A live emoji reaction wall where audience members pick their mood..."
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
-                    readOnly={isPromptLocked}
+                    readOnly={editorState.isPromptLocked}
                     className={cn(
                       "min-h-[160px] resize-none border-border/60 bg-background",
-                      isPromptLocked && "bg-muted/50",
+                      editorState.isPromptLocked && "bg-muted/50",
                     )}
                   />
                 </div>
-                {isPromptLocked ? (
+                {editorState.isPromptLocked ? (
                   <p className="rounded-lg border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                    The initial prompt is locked after generation. Use iteration feedback below to request bug fixes or improvements based on the current result.
+                    {editorState.lockedPromptMessage}
                   </p>
                 ) : (
                   <Button
@@ -184,7 +217,7 @@ export default function NewMinitoolPage() {
               </CardContent>
             </Card>
 
-            {result && (
+            {editorState.showIterateSection && (
               <Card className="overflow-hidden border-border/40 shadow-sm">
                 <CardHeader className="bg-muted/30 pb-4">
                   <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -223,7 +256,7 @@ export default function NewMinitoolPage() {
               <Card className="overflow-hidden border-border/40 shadow-sm">
                 <CardHeader className="bg-muted/30 pb-4">
                   <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    3. Name
+                    {editorState.nameStepTitle}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6">

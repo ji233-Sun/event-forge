@@ -12,6 +12,7 @@ import { CopyLinkButton } from './copy-link-button'
 import { MinitoolPublicToggle } from './minitool-public-toggle'
 import { MinitoolRenderer } from './minitool-renderer-client'
 import { ShareLinkQRCode } from '@/components/share-link-qrcode'
+import { getMinitoolEditorHref } from '../editor-link'
 
 export default async function MinitoolDetailPage({
   params,
@@ -60,6 +61,11 @@ export default async function MinitoolDetailPage({
               {shareUrl}
             </code>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="h-8 gap-1.5" asChild>
+                <Link href={getMinitoolEditorHref(tool.id)}>
+                  Edit
+                </Link>
+              </Button>
               <CopyLinkButton url={shareUrl} />
               <Button variant="outline" size="sm" className="h-8 gap-1.5" asChild>
                 <Link href={`/t/${tool.id}`} target="_blank">
