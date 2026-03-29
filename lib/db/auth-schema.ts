@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   index,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
@@ -163,6 +164,60 @@ export const response = pgTable(
   (table) => [index("response_surveyId_idx").on(table.surveyId, table.createdAt)],
 );
 
+export const minitool = pgTable(
+  'minitool',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    prompt: text('prompt').notNull(),
+    componentCode: text('component_code').notNull(),
+    hostCode: text('host_code').notNull(),
+    isPublic: boolean('is_public').default(false).notNull(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [index('minitool_userId_idx').on(table.userId, table.createdAt)],
+)
+
+export const minitoolParticipant = pgTable(
+  'minitool_participant',
+  {
+    id: text('id').primaryKey(),
+    minitoolId: text('minitool_id')
+      .notNull()
+      .references(() => minitool.id, { onDelete: 'cascade' }),
+    visitorId: text('visitor_id').notNull(),
+    data: jsonb('data').notNull().$type<Record<string, unknown>>(),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at')
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    uniqueIndex('minitool_participant_unique_idx').on(table.minitoolId, table.visitorId),
+    index('minitool_participant_minitoolId_idx').on(table.minitoolId, table.createdAt),
+  ],
+)
+
+// minitoolId is the PK — exactly one shared-state row per minitool
+export const minitoolShared = pgTable('minitool_shared', {
+  minitoolId: text('minitool_id')
+    .primaryKey()
+    .references(() => minitool.id, { onDelete: 'cascade' }),
+  data: jsonb('data').notNull().$type<Record<string, unknown>>(),
+  updatedAt: timestamp('updated_at')
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+})
+
 export const userRelations = relations(user, ({ many }) => ({
   sessions: many(session),
   accounts: many(account),
@@ -171,6 +226,7 @@ export const userRelations = relations(user, ({ many }) => ({
   mediaGenerations: many(mediaGeneration),
   mediaGenerationVariants: many(mediaGenerationVariant),
   customQuestionTypes: many(customQuestionType),
+  minitools: many(minitool),
 }));
 
 export const sessionRelations = relations(session, ({ one }) => ({
@@ -328,4 +384,18 @@ export const customQuestionTypeRelations = relations(customQuestionType, ({ one 
     fields: [customQuestionType.userId],
     references: [user.id],
   }),
+}));
+
+export const minitoolRelations = relations(minitool, ({ one, many }) => ({
+  user: one(user, { fields: [minitool.userId], references: [user.id] }),
+  participants: many(minitoolParticipant),
+  shared: one(minitoolShared, { fields: [minitool.id], references: [minitoolShared.minitoolId] }),
+}));
+
+export const minitoolParticipantRelations = relations(minitoolParticipant, ({ one }) => ({
+  minitool: one(minitool, { fields: [minitoolParticipant.minitoolId], references: [minitool.id] }),
+}));
+
+export const minitoolSharedRelations = relations(minitoolShared, ({ one }) => ({
+  minitool: one(minitool, { fields: [minitoolShared.minitoolId], references: [minitool.id] }),
 }));

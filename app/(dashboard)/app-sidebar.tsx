@@ -32,6 +32,7 @@ import {
   IconChevronUp,
   IconPresentation,
   IconSparkles,
+  IconTool,
   IconWand,
 } from '@tabler/icons-react'
 import { authClient } from '@/lib/auth-client'
@@ -145,6 +146,25 @@ export function AppSidebar({ user }: { user: User }) {
                   <Link href="/question-types">
                     <IconWand size={18} />
                     <span>Question Types</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Live Tools</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  asChild
+                  isActive={pathname === '/minitools' || pathname.startsWith('/minitools/')}
+                >
+                  <Link href="/minitools">
+                    <IconTool size={18} />
+                    <span>Minitools</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
