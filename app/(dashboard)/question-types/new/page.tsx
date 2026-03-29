@@ -25,7 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type { CreationMode } from '@/lib/agent-tasks/types'
+import { toCreationMode, type CreationMode } from '@/lib/agent-tasks/types'
 import type { GenerateCustomTypeResult } from '@/lib/question-runtime/types'
 
 import { createCustomType, getCustomTypeById, updateCustomType } from '../actions'
@@ -122,7 +122,7 @@ export default function NewQuestionTypePage() {
 
       setPrompt(type.prompt)
       setName(type.name)
-      setMode(type.creationMode ?? 'built_in_ai')
+      setMode(toCreationMode(type.creationMode))
       setResult(
         toEditableQuestionTypeResult({
           name: type.name,
@@ -135,7 +135,9 @@ export default function NewQuestionTypePage() {
   }, [editId, modeParam])
 
   useEffect(() => {
-    if (mode !== 'my_agent' || !taskState?.taskId || taskState.status !== 'waiting') {
+    const taskId = taskState?.taskId
+
+    if (mode !== 'my_agent' || !taskId || taskState.status !== 'waiting') {
       return
     }
 
@@ -143,7 +145,7 @@ export default function NewQuestionTypePage() {
 
     async function pollTask() {
       try {
-        const response = await fetch(`/api/agent-tasks/${taskState.taskId}`)
+        const response = await fetch(`/api/agent-tasks/${taskId}`)
         if (!response.ok) {
           return
         }

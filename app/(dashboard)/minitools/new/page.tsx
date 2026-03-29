@@ -26,7 +26,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import type { CreationMode } from '@/lib/agent-tasks/types'
+import { toCreationMode, type CreationMode } from '@/lib/agent-tasks/types'
 import type { GenerateMinitoolResult } from '@/lib/minitool-runtime/types'
 
 import { createMinitool, getMinitoolById, updateMinitool } from '../actions'
@@ -126,7 +126,7 @@ export default function NewMinitoolPage() {
 
       setPrompt(tool.prompt)
       setName(tool.name)
-      setMode(tool.creationMode ?? 'built_in_ai')
+      setMode(toCreationMode(tool.creationMode))
       setResult(
         toEditableMinitoolResult({
           name: tool.name,
@@ -138,7 +138,9 @@ export default function NewMinitoolPage() {
   }, [editId, modeParam])
 
   useEffect(() => {
-    if (mode !== 'my_agent' || !taskState?.taskId || taskState.status !== 'waiting') {
+    const taskId = taskState?.taskId
+
+    if (mode !== 'my_agent' || !taskId || taskState.status !== 'waiting') {
       return
     }
 
@@ -146,7 +148,7 @@ export default function NewMinitoolPage() {
 
     async function pollTask() {
       try {
-        const response = await fetch(`/api/agent-tasks/${taskState.taskId}`)
+        const response = await fetch(`/api/agent-tasks/${taskId}`)
         if (!response.ok) {
           return
         }
