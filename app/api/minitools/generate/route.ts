@@ -3,8 +3,20 @@ import { getModel } from '@/lib/ai'
 import { assertMinimaxApiKey } from '@/lib/ai/provider'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
+import { extractJson, hasTypeScript } from '@/lib/ai/code-gen-utils'
 
-const SYSTEM_PROMPT = `You are an expert React developer generating live event interactive tools (minitools).
+const SYSTEM_PROMPT = `OUTPUT DISCIPLINE — MANDATORY:
+Return ONLY the raw JSON object. No markdown, no code fences, no explanation text,
+no preamble, no postamble. The very first character must be \`{\`. The very last must be \`}\`.
+
+Before outputting, run this checklist:
+  1. Does my response start with \`{\`? If not, remove everything before it.
+  2. Do componentCode or hostCode contain TypeScript syntax? (: Type, <T>, as X, interface, enum, !.) If yes, remove it.
+  3. Does every hook state access (.data, imageUrl, audioUrl, fileUrl) have a null guard? If not, add one.
+  4. Do both code blocks end with a render() call? If not, add it.
+  5. Does hostCode poll minitool.participants.list() and display aggregated data? If not, add it.
+
+You are an expert React developer generating live event interactive tools (minitools).
 
 Stack: Next.js App Router, TypeScript, Tailwind CSS, shadcn/ui (radix-vega style).
 
@@ -100,6 +112,12 @@ FORBIDDEN — will cause SyntaxError:
 - Interface/type decls: interface Foo { ... }        →  (omit entirely)
 - Satisfies operator:   obj satisfies Foo            →  obj
 - Logical assignment:   count ??= 0                  →  count = count ?? 0
+- Non-null assertion:    value!.prop              →  value && value.prop
+- React type refs:       React.FC<Props>          →  (omit entirely)
+- as const assertion:    ['a', 'b'] as const      →  ['a', 'b']
+- Enum declarations:     enum Color { Red }       →  use plain object: { Red: 'Red' }
+- Return type annots:    function f(): string {}  →  function f() {}
+- Optional param type:   function f(x?: string)  →  function f(x) {}
 
 SAFE PATTERNS for hostCode — always use these when reading participant data:
   // list all participants and read their data safely
@@ -174,7 +192,48 @@ This project uses shadcn/ui (radix-vega style) with CSS variables. You MUST foll
    - Instead of ⏯ use <IconPlayerPlay size={16} /> / <IconPlayerPause size={16} />
    Emoji are banned in all text content, labels, buttons, headings, and placeholders.
 
-All UI text must be in English.`
+All UI text must be in English.
+
+HOST-PARTICIPANT CORRESPONDENCE — MANDATORY:
+hostCode must be a fully functional counterpart to componentCode.
+For every data-collecting feature in the participant view, the host view MUST surface it.
+
+Correspondence table:
+  Participant submits a vote / choice  → Host shows live tally with visual bar chart
+  Participant enters text / answer     → Host shows scrollable list of all submissions
+  Participant uses a slider / stars    → Host shows average score + response count
+  Participant uploads a file/image     → Host shows a gallery or submission count
+  Participant plays a game / scores    → Host shows a leaderboard sorted by score
+
+Host view technical requirements:
+  1. Call minitool.participants.list() inside useEffect with setInterval(3000) for live polling:
+       useEffect(() => {
+         const load = () => minitool.participants.list().then(list => setRows(Array.isArray(list) ? list : []))
+         load()
+         const id = setInterval(load, 3000)
+         return () => clearInterval(id)
+       }, [])
+  2. Display participantCount prominently using a Badge: "{participantCount} connected"
+  3. Never render an empty stub — always render meaningful aggregated data from rows
+  4. Use a visually distinct header color: bg-primary/10 for host vs bg-muted/30 for participant
+  5. Show a "No responses yet" empty state (text-muted-foreground) when rows is empty
+
+UI QUALITY — MANDATORY:
+Generate visually polished, design-system-consistent components. Plain text and bare inputs are not acceptable.
+
+Requirements:
+- Outer container: className="rounded-xl border border-border bg-card p-6 shadow-sm"
+- Every interactive element has a visible hover/active state (hover:bg-accent or hover:bg-muted)
+- Visualize data with <Badge>, <Progress>, or a flex bar (bg-primary/20 fill) — never plain numbers alone
+- Group related elements with <Separator /> and consistent spacing (gap-4 or space-y-3)
+- While any hook is in a loading state, show an animated skeleton:
+    <div className="h-8 animate-pulse rounded-md bg-muted" />
+- Color-code states:
+    success / submitted  → className="text-green-600 bg-green-500/10"
+    error                → className="text-destructive bg-destructive/10"
+    neutral / pending    → className="text-muted-foreground bg-muted"
+- Button sizing: size="lg" for the primary CTA, size="sm" for secondary actions
+- No emoji anywhere — use Tabler icons instead`
 
 export async function POST(request: Request) {
   assertMinimaxApiKey()
@@ -209,11 +268,19 @@ export async function POST(request: Request) {
     })
 
     const withoutThinking = result.text.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
-    const cleaned = withoutThinking.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '').trim()
-    const parsed = JSON.parse(cleaned) as Record<string, unknown>
+    const parsed = JSON.parse(extractJson(withoutThinking)) as Record<string, unknown>
 
     if (!parsed.componentCode || !parsed.hostCode || !parsed.suggestedName) {
       throw new Error('AI returned incomplete output.')
+    }
+
+    const codeFields = [parsed.componentCode, parsed.hostCode].filter(
+      (f): f is string => typeof f === 'string',
+    )
+    for (const field of codeFields) {
+      if (hasTypeScript(field)) {
+        throw new Error('Generated code contains TypeScript syntax not supported by the sandbox.')
+      }
     }
 
     return Response.json(parsed)
