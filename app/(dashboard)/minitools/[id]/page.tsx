@@ -1,7 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
 import { auth } from '@/lib/auth'
 import { headers } from 'next/headers'
-import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,11 +10,7 @@ import { IconArrowLeft, IconExternalLink } from '@tabler/icons-react'
 import { getMinitoolById, getMinitoolParticipants } from '../actions'
 import { CopyLinkButton } from './copy-link-button'
 import { MinitoolPublicToggle } from './minitool-public-toggle'
-
-const MinitoolRenderer = dynamic(
-  () => import('@/components/minitool-renderer').then((m) => m.MinitoolRenderer),
-  { ssr: false, loading: () => <div className="h-40 animate-pulse rounded-lg bg-muted" /> },
-)
+import { MinitoolRenderer } from './minitool-renderer-client'
 
 export default async function MinitoolDetailPage({
   params,
