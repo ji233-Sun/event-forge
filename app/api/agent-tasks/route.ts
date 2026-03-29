@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { buildAgentInstructions, EVENTFORGE_SKILL_URL } from '@/lib/agent-tasks/skill'
 import { createAgentTask, createAgentTaskTurn } from '@/lib/agent-tasks/service'
+import type { AgentTaskTurnKind } from '@/lib/agent-tasks/types'
 
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -22,6 +23,8 @@ export async function POST(request: Request) {
     prompt?: unknown
     existingEntityId?: unknown
     currentDraft?: unknown
+    feedback?: unknown
+    turnKind?: unknown
   }
 
   if (
@@ -33,6 +36,16 @@ export async function POST(request: Request) {
   }
 
   const prompt = payload.prompt.trim()
+  const turnKind: AgentTaskTurnKind =
+    payload.turnKind === 'iterate' ? 'iterate' : 'create'
+  const feedback =
+    typeof payload.feedback === 'string' && payload.feedback.trim().length > 0
+      ? payload.feedback.trim()
+      : null
+  if (turnKind === 'iterate' && !feedback) {
+    return Response.json({ error: 'feedback is required for iterate turns.' }, { status: 400 })
+  }
+
   const currentDraft =
     payload.currentDraft && typeof payload.currentDraft === 'object'
       ? (payload.currentDraft as Record<string, unknown>)
@@ -48,10 +61,10 @@ export async function POST(request: Request) {
   })
   const turn = await createAgentTaskTurn({
     taskId: task.id,
-    kind: 'create',
+    kind: turnKind,
     requestPayload: {
       originalPrompt: prompt,
-      iterationFeedback: null,
+      iterationFeedback: feedback,
       currentDraft,
     },
     now: new Date(),
@@ -75,7 +88,7 @@ export async function POST(request: Request) {
       submitUrl: agentSubmitUrl,
       token: turn.token,
       resourceKind: task.resourceKind,
-      turnKind: 'create',
+      turnKind,
     }),
   })
 }

@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { auth } from '@/lib/auth'
 import { buildAgentInstructions, EVENTFORGE_SKILL_URL } from '@/lib/agent-tasks/skill'
 import { createAgentTaskTurn, getOpenTaskForUser } from '@/lib/agent-tasks/service'
+import type { AgentTaskResourceKind } from '@/lib/agent-tasks/types'
 
 export async function POST(
   request: Request,
@@ -59,7 +60,7 @@ export async function POST(
       readUrl: agentReadUrl,
       submitUrl: agentSubmitUrl,
       token: turn.token,
-      resourceKind: task.resourceKind,
+      resourceKind: task.resourceKind as AgentTaskResourceKind,
       turnKind: 'iterate',
     }),
   })

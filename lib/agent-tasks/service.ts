@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm'
 
 import type { AgentTaskDraft, AgentTaskReadResponse } from './contracts'
-import type { AgentTaskResourceKind } from './types'
+import type { AgentTaskResourceKind, AgentTaskTurnKind } from './types'
 import { getOutputContract } from './skill'
 import { createTaskToken, isTaskTokenExpired, verifyTaskToken } from './token'
 import { db } from '@/lib/db'
@@ -191,7 +191,7 @@ export async function getTaskPayloadForToken({
     task: {
       id: task.id,
       resourceKind,
-      turnKind: turn.kind,
+      turnKind: turn.kind as AgentTaskTurnKind,
       skillVersion: 'v1',
     },
     brief: {

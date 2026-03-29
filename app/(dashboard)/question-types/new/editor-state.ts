@@ -1,3 +1,5 @@
+import { getAgentTaskWizardState } from '@/components/agent-task/agent-task-state'
+import type { CreationMode } from '@/lib/agent-tasks/types'
 import type {
   AnswerJsonSchema,
   CustomQuestionType,
@@ -7,6 +9,7 @@ import type {
 type QuestionTypeEditorStateInput = {
   editId: string | null
   result: GenerateCustomTypeResult | null
+  mode?: CreationMode
 }
 
 type QuestionTypeSaveRequestInput = {
@@ -30,25 +33,14 @@ export function toEditableQuestionTypeResult(
 export function getQuestionTypeEditorState({
   editId,
   result,
+  mode = 'built_in_ai',
 }: QuestionTypeEditorStateInput) {
-  const isEditing = !!editId
-  const hasResult = !!result
-
-  return {
-    isEditing,
-    isPromptLocked: hasResult || isEditing,
-    showSaveAction: hasResult,
-    showIterateSection: hasResult,
-    title: isEditing ? 'Edit Question Type' : 'Create Question Type',
-    description: isEditing
-      ? 'Refine your saved custom question type and save updates to the same library item.'
-      : 'Describe your vision, AI handles the rest.',
-    lockedPromptMessage: isEditing
-      ? 'The original prompt is read-only. Use iteration feedback below to refine this saved question type.'
-      : 'The initial prompt is locked after generation. Use iteration feedback below to request bug fixes or improvements based on the current result.',
-    saveLabel: isEditing ? 'Save Changes' : 'Save to Library',
-    identityStepTitle: '3. Identity',
-  }
+  return getAgentTaskWizardState({
+    resourceKind: 'question_type',
+    creationMode: mode,
+    editId,
+    hasResult: !!result,
+  })
 }
 
 export function buildQuestionTypeSaveRequest({

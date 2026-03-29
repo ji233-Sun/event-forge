@@ -1,30 +1,66 @@
-# EventForge Agent Skill v1
+# EventForge Agent Skill v2
 
-You are working on an EventForge agent task. Read this skill before doing anything else.
+You are working on an EventForge agent task. Read this skill first, then execute the task exactly.
 
 ## Mission
 
-Turn the task brief into a valid EventForge draft payload.
+Produce one valid EventForge draft and submit it through the task submission API.
 
-## Required workflow
+## Required execution flow
 
-1. Read the task payload from the provided read endpoint with the bearer token.
-2. Inspect the `resourceKind`, `turnKind`, `brief`, `outputContract`, and `rules`.
-3. Produce exactly one draft payload that matches the requested resource kind.
-4. Submit only that payload to the provided submit endpoint.
+1. Read the task payload.
+   - Send `GET` to the provided read endpoint.
+   - Include header: `Authorization: Bearer <token>`.
+2. Inspect the response fields:
+   - `task.resourceKind`
+   - `task.turnKind`
+   - `brief.originalPrompt`
+   - `brief.iterationFeedback`
+   - `brief.currentDraft`
+   - `outputContract`
+   - `rules`
+3. Build exactly one draft object for the requested `task.resourceKind`.
+4. Submit with the required envelope.
+   - Send `POST` to the provided submit endpoint.
+   - Include header: `Authorization: Bearer <token>`.
+   - JSON body must be:
 
-## Global rules
+```json
+{
+  "resourceKind": "question_type | minitool",
+  "result": { "...draft fields...": "..." }
+}
+```
 
-- Return only the draft payload fields. Do not add markdown fences, commentary, or extra metadata.
-- Keep all UI copy in English.
-- Preserve the user's intent. Fix bugs or polish UX only when the prompt or iteration feedback asks for it.
-- Prefer simple, working code over speculative abstractions.
-- Do not invent backend APIs, schema changes, or unsupported imports.
-- Treat `currentDraft` as the source of truth during iterate turns.
+## Turn handling
 
-## Resource contract: `question_type`
+- `task.turnKind = "create"`:
+  - Use `brief.originalPrompt` as the primary source.
+  - Produce an initial, complete draft.
+- `task.turnKind = "iterate"`:
+  - Treat `brief.currentDraft` as the baseline source of truth.
+  - Apply only the requested changes from `brief.iterationFeedback`.
+  - Keep valid existing behavior unless feedback explicitly asks to change it.
 
-Return a JSON object with:
+## Global output rules
+
+- The draft must match `outputContract` exactly: correct keys, correct value types.
+- Return only the required draft fields inside `result`; no extra metadata.
+- Keep all user-facing text in English.
+- Do not invent backend APIs, schema fields, imports, or unsupported dependencies.
+- Keep code practical and executable; avoid speculative abstractions.
+- Follow every item in `rules` from the read payload.
+
+## Runtime safety rules for generated code
+
+- No import statements in generated code strings.
+- No TypeScript-only syntax in generated code strings.
+- End each generated code block with `render(...)`.
+- Guard nullable values before property access.
+
+## Resource contract: question_type
+
+`result` must be:
 
 ```json
 {
@@ -35,16 +71,15 @@ Return a JSON object with:
 }
 ```
 
-Rules:
+Requirements:
 
-- `formCode` should render the answer input experience.
-- `displayCode` should render the saved answer for review or analytics surfaces.
-- `answerSchema` must describe the saved answer shape as JSON data.
-- Use English labels, placeholders, helper text, and error messages.
+- `formCode`: interactive answering UI.
+- `displayCode`: read-only answer display for review/analytics.
+- `answerSchema`: JSON shape describing stored answer data.
 
-## Resource contract: `minitool`
+## Resource contract: minitool
 
-Return a JSON object with:
+`result` must be:
 
 ```json
 {
@@ -54,17 +89,17 @@ Return a JSON object with:
 }
 ```
 
-Rules:
+Requirements:
 
-- `componentCode` is the audience-facing interactive view.
-- `hostCode` is the host-facing control or aggregation view.
-- Use English labels, placeholders, helper text, and empty states.
-- Keep the audience and host experiences consistent with the same task goal.
+- `componentCode`: audience-facing interaction view.
+- `hostCode`: host-facing aggregation/control view.
+- Host view must reflect participant outcomes for the same task goal.
 
-## Quality checklist
+## Pre-submit checklist
 
-- The payload matches the exact contract for the current `resourceKind`.
-- The generated name is specific and ready to display in EventForge.
-- All UI text is in English.
-- The code focuses on the requested feature set and avoids unrelated extras.
-- Iterate turns address the latest feedback without discarding valid existing behavior.
+- I used `task.resourceKind` and `task.turnKind` (not guessed fields).
+- I followed `rules` and `outputContract` from the read payload.
+- My `result` object has exactly the required keys for this resource kind.
+- All code fields are plain JS/JSX-compatible and end with `render(...)`.
+- All UI copy is English.
+- I submitted with envelope `{ resourceKind, result }` to the submit endpoint.
