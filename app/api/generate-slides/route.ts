@@ -5,6 +5,19 @@ import { resolvePalette, type Palette } from "@/lib/slides/template/css-builder"
 import { DEFAULT_TEMPLATE_VALUES, TEMPLATE_OPTIONS, type TemplateValues } from "@/lib/slides/template/config";
 import { headers } from "next/headers";
 
+type DetailLevel = "concise" | "balanced" | "detailed";
+
+const DETAIL_LEVEL_OPTIONS: readonly DetailLevel[] = ["concise", "balanced", "detailed"];
+
+function resolveDetailLevel(value: unknown): DetailLevel {
+  if (typeof value !== "string") return "detailed";
+  const normalized = value.trim().toLowerCase();
+  if ((DETAIL_LEVEL_OPTIONS as readonly string[]).includes(normalized)) {
+    return normalized as DetailLevel;
+  }
+  return "detailed";
+}
+
 function extractMarkdown(text: string): string {
   const trimmed = text.trim();
 
@@ -53,13 +66,26 @@ function isValidTemplateValues(v: unknown): v is TemplateValues {
   );
 }
 
-function buildBaseSystemPrompt(language: string, palette: Palette, slideCount: number): string {
+function buildBaseSystemPrompt(language: string, palette: Palette, slideCount: number, detailLevel: DetailLevel): string {
   const normalizedLanguage = language.trim() || "English";
   const isChinese = isChineseLanguage(normalizedLanguage);
   const label = isChinese ? "中文" : normalizedLanguage;
+  const detailLabel = detailLevel === "concise"
+    ? "Concise"
+    : detailLevel === "balanced"
+      ? "Balanced"
+      : "Detailed";
   const itemLengthRule = isChinese
-    ? "Each list must have at most 4 items, and each item must stay within 18 Chinese characters."
-    : "Each list must have at most 4 items, and each item should stay brief (roughly 8-12 words).";
+    ? detailLevel === "concise"
+      ? "Each list must have at most 4 items, and each item must stay within 18 Chinese characters."
+      : detailLevel === "balanced"
+        ? "Each list must have at most 4 items, and each item should stay within 22 Chinese characters and include useful context."
+        : "Each list must have at most 4 items, and each item should stay within 28 Chinese characters with concrete details or implications."
+    : detailLevel === "concise"
+      ? "Each list must have at most 4 items, and each item should stay brief (roughly 8-12 words)."
+      : detailLevel === "balanced"
+        ? "Each list must have at most 4 items, and each item should stay clear and informative (roughly 10-16 words)."
+        : "Each list must have at most 4 items, and each item should include meaningful detail (roughly 12-22 words).";
   const coverRule = isChinese
     ? "Keep the cover title within 15 Chinese characters."
     : "Keep the cover title concise (roughly 3-8 words).";
@@ -69,15 +95,25 @@ function buildBaseSystemPrompt(language: string, palette: Palette, slideCount: n
   const barCategories = isChinese
     ? ["场地", "设备", "宣传", "餐饮", "礼品"]
     : ["Venue", "Equipment", "Marketing", "Catering", "Merch"];
-  const pieCategories = isChinese
-    ? ["赞助", "门票", "周边", "其他"]
-    : ["Sponsorship", "Tickets", "Merch", "Other"];
-  const weekLabels = isChinese
-    ? ["第1周", "第2周", "第3周", "第4周", "第5周", "第6周"]
-    : ["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6"];
 
   const BT = "`";
   const tripleBT = BT + BT + BT;
+
+  const depthRules = detailLevel === "concise"
+    ? [
+      "- Keep text lightweight while still actionable.",
+      "- Each content slide should include at least one clear takeaway sentence.",
+    ]
+    : detailLevel === "balanced"
+      ? [
+        "- Each content slide should include a concise supporting explanation, not just keyword bullets.",
+        "- Add one concrete example, metric, or implementation detail where possible.",
+      ]
+      : [
+        "- Each content slide must include explanatory context, practical implications, and at least one concrete detail.",
+        "- Expand sparse bullets into informative statements with specific outcomes, numbers, or examples.",
+        "- Chart slides should include a chart plus 2 short interpretation sentences (insight + action).",
+      ];
 
   const chartExample = JSON.stringify({
     color: [palette.primary, palette.secondary, palette.accent, palette.slideMuted, palette.slideText],
@@ -104,6 +140,7 @@ function buildBaseSystemPrompt(language: string, palette: Palette, slideCount: n
     "- Output pure Markdown only. No explanation or extra wrapper text.",
     "- Do NOT wrap your entire output in a code block. Output raw Markdown directly.",
     "- All slide copy must be written in " + label + ".",
+    "- Depth mode: " + detailLabel + ".",
     "- Separate each slide with ---.",
     "- Do NOT output raw HTML tags. Use standard Markdown syntax only.",
     "- Do NOT include any YAML front-matter block (no --- YAML header).",
@@ -127,16 +164,19 @@ function buildBaseSystemPrompt(language: string, palette: Palette, slideCount: n
     "Overflow rules for a 1280x720 canvas:",
     "- Keep the total visible lines per slide at or under 12.",
     "- " + itemLengthRule,
-    "- Chart slides should use one short supporting sentence plus one chart.",
+    "- Chart slides should include chart context text, not only raw chart data.",
     "- Keep each column under 6 lines in two-column layouts.",
     "- Use at most 3 KPI cards in one row.",
     "- Split content across more slides instead of cramming.",
     "- " + coverRule,
     "",
+    "Content depth rules:",
+    ...depthRules,
+    "",
     "Copy rules:",
     "- All slide copy must be written in " + label + ".",
     "- " + unitsRule,
-    "- Keep the writing concise and presentation-ready.",
+    "- Keep the writing presentation-ready with meaningful explanatory detail.",
     "",
     "Visual direction:",
     "- Use emphasis, horizontal rules (---), and code blocks for visual separation.",
@@ -160,13 +200,17 @@ function buildBaseSystemPrompt(language: string, palette: Palette, slideCount: n
   ].join("\n");
 }
 
-function buildRetryConstraint(language: string, slideCount: number): string {
+function buildRetryConstraint(language: string, slideCount: number, detailLevel: DetailLevel): string {
   const minSeparators = slideCount - 1;
+  const detailExpansionRule = detailLevel === "detailed"
+    ? "- Expand sparse slides with concrete examples, numbers, and actionable details."
+    : "- Expand sparse slides with concise explanatory details.";
   if (isChineseLanguage(language)) {
     return [
       "Hard requirement: output at least " + slideCount + " slides.",
       "- Include at least " + minSeparators + " slide separators (---).",
       "- If the source material is thin, add an agenda, content, and closing slide.",
+      detailExpansionRule,
     ].join("\n");
   }
   return [
@@ -174,6 +218,7 @@ function buildRetryConstraint(language: string, slideCount: number): string {
     "- Include at least " + minSeparators + " slide separators (---).",
     "- Never return a single-slide deck.",
     "- If the source material is thin, add an agenda, approach, budget, timeline, and closing slide.",
+    detailExpansionRule,
   ].join("\n");
 }
 async function generateMarkdown(
@@ -181,11 +226,13 @@ async function generateMarkdown(
   language: string,
   palette: Palette,
   slideCount: number,
+  detailLevel: DetailLevel,
   extraConstraint?: string,
 ): Promise<{ text: string; finishReason: string }> {
+  const maxOutputTokens = detailLevel === "concise" ? 9000 : detailLevel === "balanced" ? 11000 : 13000;
   const { text, finishReason } = await generate("medium", prompt, {
-    maxOutputTokens: 10000,
-    system: [buildBaseSystemPrompt(language, palette, slideCount), extraConstraint].filter(Boolean).join("\n\n"),
+    maxOutputTokens,
+    system: [buildBaseSystemPrompt(language, palette, slideCount, detailLevel), extraConstraint].filter(Boolean).join("\n\n"),
   });
 
   return {
@@ -211,11 +258,12 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { prompt, language, templateValues, slideCount: rawSlideCount } = body as {
+  const { prompt, language, templateValues, slideCount: rawSlideCount, detailLevel: rawDetailLevel } = body as {
     prompt?: string;
     language?: string;
     templateValues?: unknown;
     slideCount?: unknown;
+    detailLevel?: unknown;
   };
 
   if (typeof prompt !== "string" || prompt.trim() === "") {
@@ -238,12 +286,13 @@ ${trimmedPrompt}`;
   const requestedSlideCount = typeof rawSlideCount === "number" && Number.isInteger(rawSlideCount)
     ? Math.max(4, Math.min(16, rawSlideCount))
     : 8;
+  const detailLevel = resolveDetailLevel(rawDetailLevel);
 
   let markdown: string;
   let slideCount: number;
 
   try {
-    const { text, finishReason } = await generateMarkdown(basePrompt, outputLanguage, palette, requestedSlideCount);
+    const { text, finishReason } = await generateMarkdown(basePrompt, outputLanguage, palette, requestedSlideCount, detailLevel);
 
     if (finishReason === "length") {
       return Response.json(
@@ -268,7 +317,8 @@ ${trimmedPrompt}`;
         outputLanguage,
         palette,
         requestedSlideCount,
-        buildRetryConstraint(outputLanguage, requestedSlideCount),
+        detailLevel,
+        buildRetryConstraint(outputLanguage, requestedSlideCount, detailLevel),
       );
 
       if (retry.finishReason === "length") {

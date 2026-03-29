@@ -43,6 +43,7 @@ import {
 } from '@tabler/icons-react'
 
 type Phase = 'input' | 'style-pick' | 'generating' | 'studio' | 'image-generating' | 'image-studio'
+const DEFAULT_DETAIL_LEVEL = 'detailed'
 
 const samplePrompts = [
   'A campus country music festival for 200 attendees with sponsor booths, handmade market stalls, and food pop-ups.',
@@ -104,7 +105,12 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       const res = await fetch('/api/generate-slides', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, templateValues: getTemplateValues(templateState), slideCount }),
+        body: JSON.stringify({
+          prompt,
+          templateValues: getTemplateValues(templateState),
+          slideCount,
+          detailLevel: DEFAULT_DETAIL_LEVEL,
+        }),
       })
 
       if (!res.ok) {

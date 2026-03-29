@@ -222,4 +222,38 @@ describe("POST /api/generate-slides", () => {
     // Clamped to minimum 4
     expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain("Generate exactly 4 slides");
   });
+
+  it("defaults to detailed depth mode when detailLevel is omitted", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: Array.from({ length: 8 }, (_, i) => `# Slide ${i + 1}`).join("\n\n---\n\n"),
+      finishReason: "stop",
+    });
+
+    const req = new Request("http://localhost/api/generate-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "a campus festival" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain("Depth mode: Detailed");
+  });
+
+  it("applies concise depth mode when requested", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: Array.from({ length: 8 }, (_, i) => `# Slide ${i + 1}`).join("\n\n---\n\n"),
+      finishReason: "stop",
+    });
+
+    const req = new Request("http://localhost/api/generate-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: "a campus festival", detailLevel: "concise" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain("Depth mode: Concise");
+  });
 });

@@ -160,6 +160,167 @@ describe("POST /api/edit-slides", () => {
     });
   });
 
+  it("preserves echarts fenced block when editing current slide", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: "## Revenue Outlook\n\n```echarts\n{\"series\":[{\"type\":\"bar\",\"data\":[12,22,30]}]}\n```",
+      finishReason: "stop",
+    });
+
+    const markdown = [
+      "# Cover",
+      "",
+      "---",
+      "",
+      "## Chart Slide",
+      "",
+      "Old content",
+    ].join("\n");
+
+    const request = new Request("http://localhost/api/edit-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markdown,
+        instruction: "Replace with a chart",
+        scope: "current",
+        currentSlideIndex: 1,
+      }),
+    });
+
+    const response = await POST(request);
+    const payload = (await response.json()) as { markdown?: string };
+
+    expect(response.status).toBe(200);
+    expect(payload.markdown).toContain("```echarts");
+    expect(payload.markdown).toContain("# Cover");
+  });
+
+  it("does not collapse full deck when AI output contains echarts fences", async () => {
+    const originalDeck = [
+      "# Cover",
+      "Intro",
+      "",
+      "---",
+      "",
+      "## Revenue",
+      "Legacy content",
+      "",
+      "---",
+      "",
+      "## Closing",
+      "Thanks",
+    ].join("\n");
+
+    const fullDeck = [
+      "# Cover",
+      "Intro",
+      "",
+      "---",
+      "",
+      "## Revenue Outlook",
+      "",
+      "```echarts",
+      "{\"series\":[{\"type\":\"bar\",\"data\":[10,20,30]}]}",
+      "```",
+      "",
+      "---",
+      "",
+      "## Closing",
+      "Thanks",
+    ].join("\n");
+
+    mockGenerate.mockResolvedValueOnce({
+      text: fullDeck,
+      finishReason: "stop",
+    });
+
+    const request = new Request("http://localhost/api/edit-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markdown: originalDeck,
+        instruction: "Improve content",
+        scope: "all",
+      }),
+    });
+
+    const response = await POST(request);
+    const payload = (await response.json()) as { markdown?: string };
+
+    expect(response.status).toBe(200);
+    expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain("across the entire deck");
+    expect(payload.markdown).toContain("```echarts");
+    expect(payload.markdown).toContain("## Closing");
+    expect(payload.markdown).toContain("\n---\n");
+  });
+
+  it("returns 502 when full-deck output changes slide count unexpectedly", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: "# Collapsed deck",
+      finishReason: "stop",
+    });
+
+    const markdown = [
+      "# Slide 1",
+      "",
+      "---",
+      "",
+      "# Slide 2",
+      "",
+      "---",
+      "",
+      "# Slide 3",
+    ].join("\n");
+
+    const request = new Request("http://localhost/api/edit-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markdown,
+        instruction: "Improve the flow",
+        scope: "all",
+      }),
+    });
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(502);
+    await expect(response.json()).resolves.toEqual({
+      error: "Edited deck must keep 3 slides, but got 1. Please retry with a clearer instruction.",
+    });
+  });
+
+  it("allows full-deck slide count change when instruction explicitly requests it", async () => {
+    mockGenerate.mockResolvedValueOnce({
+      text: "# Unified Slide\n\nMerged content",
+      finishReason: "stop",
+    });
+
+    const markdown = [
+      "# Slide 1",
+      "",
+      "---",
+      "",
+      "# Slide 2",
+    ].join("\n");
+
+    const request = new Request("http://localhost/api/edit-slides", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        markdown,
+        instruction: "Merge these slides into 1 slide",
+        scope: "all",
+      }),
+    });
+
+    const response = await POST(request);
+    const payload = (await response.json()) as { markdown?: string };
+
+    expect(response.status).toBe(200);
+    expect(payload.markdown).toContain("# Unified Slide");
+  });
+
   it("returns 502 when full-deck AI editing throws", async () => {
     mockGenerate.mockRejectedValueOnce(new Error("provider down"));
 

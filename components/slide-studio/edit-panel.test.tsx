@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   EditPanel,
   EDIT_PANEL_SUBMIT_HINT,
+  EXPAND_DECK_INSTRUCTION,
+  RELAYOUT_DECK_INSTRUCTION,
   handleEditInstructionKeyDown,
 } from "./edit-panel";
 
@@ -74,5 +76,22 @@ describe("EditPanel", () => {
     );
 
     expect(markup).toContain(EDIT_PANEL_SUBMIT_HINT);
+  });
+
+  it("renders quick-action controls for whole-deck expansion and relayout", () => {
+    const markup = renderToStaticMarkup(
+      <EditPanel
+        currentSlideNumber={2}
+        onEdit={async () => undefined}
+        isLoading={false}
+        error={null}
+      />,
+    );
+
+    expect(markup).toContain("Quick Actions");
+    expect(markup).toContain("Expand Details (All Slides)");
+    expect(markup).toContain("Expand &amp; Re-layout Deck");
+    expect(EXPAND_DECK_INSTRUCTION.length).toBeGreaterThan(0);
+    expect(RELAYOUT_DECK_INSTRUCTION.length).toBeGreaterThan(0);
   });
 });

@@ -18,6 +18,8 @@ interface EditPanelProps {
 }
 
 export const EDIT_PANEL_SUBMIT_HINT = "Ctrl/⌘ + Enter to submit";
+export const EXPAND_DECK_INSTRUCTION = "Expand all slides with richer details, concrete examples, and stronger supporting context while keeping the deck professional and readable.";
+export const RELAYOUT_DECK_INSTRUCTION = "Re-layout the entire deck for stronger visual variety and flow. Keep the same slide count, but rewrite slide structures to avoid repetitive layouts and improve readability.";
 
 type EditInstructionKeyEvent = Pick<
   React.KeyboardEvent<HTMLTextAreaElement>,
@@ -49,6 +51,11 @@ export function EditPanel({
     if (!instruction.trim() || isLoading) return;
     await onEdit(instruction.trim(), applyToAll ? "all" : "current");
     setInstruction("");
+  }
+
+  async function handleQuickAction(actionInstruction: string) {
+    if (isLoading) return;
+    await onEdit(actionInstruction, "all");
   }
 
   return (
@@ -94,6 +101,36 @@ export function EditPanel({
           void handleEditInstructionKeyDown(e, handleSubmit);
         }}
       />
+
+      <div className="rounded-md border border-border/60 bg-muted/20 p-2.5">
+        <p className="mb-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Quick Actions
+        </p>
+        <div className="grid gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isLoading}
+            onClick={() => {
+              void handleQuickAction(EXPAND_DECK_INSTRUCTION);
+            }}
+          >
+            Expand Details (All Slides)
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isLoading}
+            onClick={() => {
+              void handleQuickAction(RELAYOUT_DECK_INSTRUCTION);
+            }}
+          >
+            Expand & Re-layout Deck
+          </Button>
+        </div>
+      </div>
 
       {/* Error */}
       {error && (
