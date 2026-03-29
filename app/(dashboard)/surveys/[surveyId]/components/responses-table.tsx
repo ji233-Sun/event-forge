@@ -10,11 +10,6 @@ const responseDateFormatter = new Intl.DateTimeFormat('en-US', {
 
 type Question = {
   id: string
-  type: string
-  title: string
-  options: unknown
-  formCodeSnapshot?: string | null
-  displayCodeSnapshot?: string | null
 }
 
 type ResponseData = {

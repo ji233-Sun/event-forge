@@ -55,7 +55,7 @@ export function ResponseDetail({
       {/* Sidebar */}
       <aside className="w-52 shrink-0 border-r border-border bg-background flex flex-col gap-6 p-6">
         <Link
-          href={`/surveys/${surveyId}`}
+          href={`/surveys/${surveyId}?tab=responses`}
           className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
         >
           <IconChevronLeft size={16} />
