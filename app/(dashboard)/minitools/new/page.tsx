@@ -191,7 +191,7 @@ export default function NewMinitoolPage() {
                       onClick={() => setActiveTab('audience')}
                       className="h-8 gap-1.5 px-3 text-xs"
                     >
-                      <IconTool size={14} />Audience View
+                      <IconUsers size={14} />Audience View
                     </Button>
                     <Button
                       variant={activeTab === 'host' ? 'secondary' : 'ghost'}
@@ -199,7 +199,7 @@ export default function NewMinitoolPage() {
                       onClick={() => setActiveTab('host')}
                       className="h-8 gap-1.5 px-3 text-xs"
                     >
-                      <IconUsers size={14} />Host View
+                      <IconTool size={14} />Host View
                     </Button>
                   </div>
                   <Badge variant="outline" className="bg-green-500/5 text-green-600 border-green-200">
