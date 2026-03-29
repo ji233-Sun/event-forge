@@ -12,7 +12,7 @@ export default async function PublicMinitoolPage({
 
   const tool = await db.query.minitool.findFirst({
     where: eq(minitool.id, id),
-    columns: { id: true, name: true, componentCode: true, isPublic: true },
+    columns: { id: true, componentCode: true, isPublic: true },
   })
 
   // isPublic: false → friendly "not available" (no redirect, no 404 — avoids leaking existence)
