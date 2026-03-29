@@ -1,18 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockRender, mockGetSession, mockHeaders } = vi.hoisted(() => ({
-  mockRender: vi.fn(() => ({
-    html: "<section>Restyled</section>",
-    css: "section { color: blue; }",
-  })),
+const { mockGetSession, mockHeaders } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
   mockHeaders: vi.fn(),
-}));
-
-vi.mock("@marp-team/marp-core", () => ({
-  default: class MockMarp {
-    render = mockRender;
-  },
 }));
 
 vi.mock("@/lib/auth", () => ({
@@ -37,25 +27,19 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  mockRender.mockReset();
   mockGetSession.mockReset();
   mockHeaders.mockReset();
-  mockRender.mockImplementation(() => ({
-    html: "<section>Restyled</section>",
-    css: "section { color: blue; }",
-  }));
 });
 
-const SAMPLE_MARKDOWN = `---
-marp: true
-theme: default
-paginate: true
-style: |
-  section { background: #000; }
+const SAMPLE_MARKDOWN = `# Title
+
+Some content
+
 ---
 
-# Title
-`;
+## Slide Two
+
+More content`;
 
 describe("POST /api/restyle-slides", () => {
   it("returns 401 when unauthenticated", async () => {
@@ -90,7 +74,7 @@ describe("POST /api/restyle-slides", () => {
     expect(res.status).toBe(400);
   });
 
-  it("returns html, css, markdown on success with default template", async () => {
+  it("returns markdown on success with default template", async () => {
     const req = new Request("http://localhost/api/restyle-slides", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -98,46 +82,54 @@ describe("POST /api/restyle-slides", () => {
     });
     const res = await POST(req);
     expect(res.status).toBe(200);
-    const data = await res.json() as { html: string; css: string; markdown: string };
-    expect(data.html).toBeDefined();
-    expect(data.css).toBeDefined();
+    const data = (await res.json()) as { markdown: string };
     expect(data.markdown).toBeDefined();
   });
 
-  it("calls Marp.render with the restyled markdown", async () => {
+  it("replaces ECharts hex colors when palette changes", async () => {
+    const chartMarkdown = [
+      "# Budget",
+      "",
+      "```echarts",
+      JSON.stringify({
+        color: ["#06b6d4", "#0891b2"],
+        backgroundColor: "transparent",
+      }),
+      "```",
+    ].join("\n");
+
     const req = new Request("http://localhost/api/restyle-slides", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        markdown: SAMPLE_MARKDOWN,
+        markdown: chartMarkdown,
+        prevTemplateValues: {
+          themeMode: "dark",
+          baseColor: "slate",
+          primaryColor: "cyan",
+          bgStyle: "radial-gradient",
+          headingFont: "Space Grotesk",
+          bodyFont: "Open Sans",
+          cardStyle: "glassmorphism",
+          borderRadius: "16px",
+        },
         templateValues: {
-          themeMode: "light",
-          baseColor: "neutral",
+          themeMode: "dark",
+          baseColor: "slate",
           primaryColor: "rose",
-          bgStyle: "solid",
-          headingFont: "Inter",
-          bodyFont: "Roboto",
-          cardStyle: "flat",
-          borderRadius: "8px",
+          bgStyle: "radial-gradient",
+          headingFont: "Space Grotesk",
+          bodyFont: "Open Sans",
+          cardStyle: "glassmorphism",
+          borderRadius: "16px",
         },
       }),
     });
     const res = await POST(req);
     expect(res.status).toBe(200);
-    expect(mockRender).toHaveBeenCalledOnce();
-    // The rendered markdown should have new style injected
-    expect(mockRender).toHaveBeenCalledWith(expect.stringContaining("style: |"));
-    expect(mockRender).not.toHaveBeenCalledWith(expect.stringContaining("[GENERATE HEX]"));
-  });
-
-  it("returns 502 when Marp render throws", async () => {
-    mockRender.mockImplementationOnce(() => { throw new Error("render error"); });
-    const req = new Request("http://localhost/api/restyle-slides", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markdown: SAMPLE_MARKDOWN }),
-    });
-    const res = await POST(req);
-    expect(res.status).toBe(502);
+    const data = (await res.json()) as { markdown: string };
+    // cyan primary #06b6d4 should be replaced with rose primary #f43f5e
+    expect(data.markdown).toContain("#f43f5e");
+    expect(data.markdown).not.toContain("#06b6d4");
   });
 });

@@ -1,11 +1,15 @@
-import Marp from "@marp-team/marp-core";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
+import { parseSlides } from "@/lib/slides";
 
 type RenderRequestBody = {
   markdown?: unknown;
 };
 
+/**
+ * This endpoint now simply validates and parses the markdown,
+ * returning the split slides. Actual rendering happens client-side.
+ */
 export async function POST(request: Request) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) {
@@ -25,14 +29,13 @@ export async function POST(request: Request) {
   }
 
   try {
-    const marp = new Marp({ html: true });
-    const { html, css } = marp.render(body.markdown);
-    return Response.json({ html, css });
+    const slides = parseSlides(body.markdown);
+    return Response.json({ slides, count: slides.length });
   } catch (error) {
     console.error("[slides/render] failed:", error);
     return Response.json(
-      { error: "Failed to render markdown with Marp" },
-      { status: 500 }
+      { error: "Failed to parse markdown" },
+      { status: 500 },
     );
   }
 }

@@ -14,7 +14,6 @@ import {
   updateDeckImages,
   deleteDeck,
   getDeck,
-  renderMarkdown,
 } from './actions'
 import type { DeckSummary, SlideMode, ImageSlide } from './actions'
 import { ImageGeneratingScreen } from '@/components/slide-studio/image-generating-screen'
@@ -42,12 +41,6 @@ import {
 
 type Phase = 'input' | 'style-pick' | 'generating' | 'studio' | 'image-generating' | 'image-studio'
 
-interface SlideSession {
-  markdown: string
-  html: string
-  css: string
-}
-
 const samplePrompts = [
   'A campus country music festival for 200 attendees with sponsor booths, handmade market stalls, and food pop-ups.',
   'A university esports league across five campuses with 500 expected spectators and a need for hardware sponsorships.',
@@ -64,7 +57,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const [prompt, setPrompt] = useState('')
   const [generateError, setGenerateError] = useState<string | null>(null)
 
-  const [session, setSession] = useState<SlideSession | null>(null)
+  const [markdown, setMarkdown] = useState<string | null>(null)
   const [deckId, setDeckId] = useState<string | null>(null)
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0)
   const currentSlideIndexRef = useRef(currentSlideIndex)
@@ -111,10 +104,11 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         throw new Error(message)
       }
 
-      const data = (await res.json()) as { html?: string; css?: string; markdown?: string }
-      if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
+      const data = (await res.json()) as { markdown?: string }
+      if (!data.markdown) throw new Error('Invalid response')
 
-      const title = getSlideTitle(parseSlides(data.markdown)[0], 'Untitled Deck')
+      const slides = parseSlides(data.markdown)
+      const title = getSlideTitle(slides[0], 'Untitled Deck')
       const saved = await saveDeck({
         title,
         prompt: prompt.trim(),
@@ -125,7 +119,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
 
       setDeckId(saved.id)
       setDecks((prev) => [{ id: saved.id, title, prompt: prompt.trim(), mode: 'marp', createdAt: new Date() }, ...prev])
-      setSession({ html: data.html, css: data.css, markdown: data.markdown })
+      setMarkdown(data.markdown)
       setCurrentSlideIndex(0)
       setPhase('studio')
     } catch (e) {
@@ -235,7 +229,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   // ── Edit ──────────────────────────────────────────────────────────────
   const handleEdit = useCallback(
     async (instruction: string, scope: 'current' | 'all') => {
-      if (!session) return
+      if (!markdown) return
       setEditLoading(true)
       setEditError(null)
 
@@ -244,7 +238,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            markdown: session.markdown,
+            markdown,
             instruction,
             scope,
             currentSlideIndex: currentSlideIndexRef.current,
@@ -257,8 +251,8 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           throw new Error(message)
         }
 
-        const data = (await res.json()) as { html?: string; css?: string; markdown?: string }
-        if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
+        const data = (await res.json()) as { markdown?: string }
+        if (!data.markdown) throw new Error('Invalid response')
 
         if (deckId) await updateDeckMarkdown(deckId, data.markdown)
 
@@ -267,7 +261,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
           ? currentSlideIndexRef.current
           : newSlideCount - 1
 
-        setSession({ html: data.html, css: data.css, markdown: data.markdown })
+        setMarkdown(data.markdown)
         setCurrentSlideIndex(nextIndex)
       } catch (e) {
         setEditError(e instanceof Error ? e.message : 'Something went wrong')
@@ -275,14 +269,14 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         setEditLoading(false)
       }
     },
-    [session, deckId],
+    [markdown, deckId],
   )
 
   const handleTemplateValueChange = useCallback(
     <K extends TemplateKey>(key: K, value: TemplateValues[K]) => {
       setTemplateState((prev) => setTemplateValue(prev, key, value))
     },
-    []
+    [],
   )
 
   const handleToggleLock = useCallback((key: TemplateKey) => {
@@ -293,9 +287,9 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     setTemplateState((prev) => shuffleTemplateState(prev))
   }, [])
 
-  // Shared restyle helper: replaces CSS + ECharts colors, updates session + DB
+  // Shared restyle helper: replaces ECharts colors, updates markdown + DB
   const handleRestyle = useCallback(async (prevValues: TemplateValues, newValues: TemplateValues) => {
-    if (!session) return
+    if (!markdown) return
     setIsRestyling(true)
     setRestyleError(null)
     try {
@@ -303,7 +297,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          markdown: session.markdown,
+          markdown,
           prevTemplateValues: prevValues,
           templateValues: newValues,
         }),
@@ -313,16 +307,16 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         try { const err = (await res.json()) as { error?: string }; message = err.error ?? message } catch { /* */ }
         throw new Error(message)
       }
-      const data = (await res.json()) as { html?: string; css?: string; markdown?: string }
-      if (!data.html || !data.css || !data.markdown) throw new Error('Invalid response')
+      const data = (await res.json()) as { markdown?: string }
+      if (!data.markdown) throw new Error('Invalid response')
       if (deckId) await updateDeckMarkdown(deckId, data.markdown)
-      setSession({ html: data.html, css: data.css, markdown: data.markdown })
+      setMarkdown(data.markdown)
     } catch (e) {
       setRestyleError(e instanceof Error ? e.message : 'Restyle failed')
     } finally {
       setIsRestyling(false)
     }
-  }, [session, deckId])
+  }, [markdown, deckId])
 
   const handleShuffle = useCallback(() => {
     const prevValues = getTemplateValues(templateState)
@@ -339,7 +333,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       setTemplateState((prev) => setTemplateValue(prev, key, value))
       void handleRestyle(prevValues, newValues as TemplateValues)
     },
-    [templateState, handleRestyle]
+    [templateState, handleRestyle],
   )
 
   // Apply a decoded preset in Studio: restyle with ECharts color replacement
@@ -347,7 +341,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     const prevValues = getTemplateValues(templateState)
     setTemplateState((prev) => {
       return Object.fromEntries(
-        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }])
+        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }]),
       ) as TemplateStoreState
     })
     void handleRestyle(prevValues, newValues)
@@ -357,7 +351,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   const handlePreGenPresetApply = useCallback((newValues: TemplateValues) => {
     setTemplateState((prev) => {
       return Object.fromEntries(
-        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }])
+        TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: newValues[key] }]),
       ) as TemplateStoreState
     })
   }, [])
@@ -367,7 +361,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
     const slideState = imageSlideStates.find((s) => s.index === index)
     if (!slideState) return
     setImageSlideStates((prev) =>
-      prev.map((s) => (s.index === index ? { ...s, status: 'generating' as const, url: undefined } : s))
+      prev.map((s) => (s.index === index ? { ...s, status: 'generating' as const, url: undefined } : s)),
     )
     try {
       const res = await fetch('/api/generate-slide-image', {
@@ -379,7 +373,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       const img = await res.json() as { index: number; url: string }
       setImageSlideStates((prev) => {
         const next = prev.map((s) =>
-          s.index === index ? { ...s, status: 'done' as const, url: img.url } : s
+          s.index === index ? { ...s, status: 'done' as const, url: img.url } : s,
         )
         if (deckId) {
           const persisted: ImageSlide[] = next.map((s) => ({
@@ -394,7 +388,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
       })
     } catch {
       setImageSlideStates((prev) =>
-        prev.map((s) => (s.index === index ? { ...s, status: 'failed' as const } : s))
+        prev.map((s) => (s.index === index ? { ...s, status: 'failed' as const } : s)),
       )
     }
   }
@@ -412,7 +406,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         setTemplateState((prev) => {
           const tv = d.templateValues!
           return Object.fromEntries(
-            TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: tv[key] }])
+            TEMPLATE_KEYS.map((key) => [key, { ...prev[key], value: tv[key] }]),
           ) as TemplateStoreState
         })
       }
@@ -427,9 +421,9 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
         setDeckId(d.id)
         setPhase('image-studio')
       } else {
-        const { html, css } = await renderMarkdown(d.markdown ?? '')
+        // Load markdown directly — no server-side rendering needed
         setDeckId(d.id)
-        setSession({ html, css, markdown: d.markdown ?? '' })
+        setMarkdown(d.markdown ?? '')
         setCurrentSlideIndex(0)
         setPhase('studio')
       }
@@ -452,7 +446,8 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
   }
 
   // ── Derived state ─────────────────────────────────────────────────────
-  const slides = session ? parseSlides(session.markdown) : []
+  const currentTemplateValues = getTemplateValues(templateState)
+  const slides = markdown ? parseSlides(markdown) : []
   const titles = slides.map((seg, i) => getSlideTitle(seg, `Slide ${i + 1}`))
 
   // ── Render: Style Pick ────────────────────────────────────────────────
@@ -522,7 +517,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             size="sm"
             onClick={() => {
               setPhase('input')
-              setSession(null)
+              setMarkdown(null)
               setDeckId(null)
               setCurrentSlideIndex(0)
               setEditError(null)
@@ -551,11 +546,11 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
             />
           </aside>
           <main className="flex-1 overflow-hidden bg-black">
-            {session && (
+            {markdown && (
               <SlidePreview
                 ref={previewRef}
-                html={session.html}
-                css={session.css}
+                markdown={markdown}
+                templateValues={currentTemplateValues}
                 currentSlide={currentSlideIndex}
                 onSlideChange={setCurrentSlideIndex}
               />
@@ -675,7 +670,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
                     : 'bg-background text-muted-foreground hover:bg-muted',
                 ].join(' ')}
               >
-                Marp
+                Markdown
               </button>
               <button
                 type="button"
@@ -717,7 +712,7 @@ export function SlidesPageClient({ initialDecks }: { initialDecks: DeckSummary[]
                       <div className="flex items-center gap-1.5">
                         <p className="truncate text-sm font-medium">{d.title}</p>
                         <span className="shrink-0 rounded bg-muted px-1 py-0.5 text-[9px] font-medium uppercase tracking-wide text-muted-foreground">
-                          {d.mode === 'image' ? 'Image' : 'Marp'}
+                          {d.mode === 'image' ? 'Image' : 'MD'}
                         </span>
                       </div>
                       <p className="truncate text-xs text-muted-foreground">

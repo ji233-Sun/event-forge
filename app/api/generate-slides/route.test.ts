@@ -1,11 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGenerate, mockRender, mockGetSession, mockHeaders } = vi.hoisted(() => ({
+const { mockGenerate, mockGetSession, mockHeaders } = vi.hoisted(() => ({
   mockGenerate: vi.fn(),
-  mockRender: vi.fn(() => ({
-    html: "<section>Rendered</section>",
-    css: "section { color: red; }",
-  })),
   mockGetSession: vi.fn(),
   mockHeaders: vi.fn(),
 }));
@@ -26,27 +22,15 @@ vi.mock("next/headers", () => ({
   headers: mockHeaders,
 }));
 
-vi.mock("@marp-team/marp-core", () => ({
-  default: class MockMarp {
-    render = mockRender;
-  },
-}));
-
 import { POST } from "./route";
 
-// Initialize defaults before each test
 beforeEach(() => {
   mockGetSession.mockResolvedValue({ user: { id: "user_123" } });
   mockHeaders.mockResolvedValue(new Headers());
-  mockRender.mockImplementation(() => ({
-    html: "<section>Rendered</section>",
-    css: "section { color: red; }",
-  }));
 });
 
 afterEach(() => {
   mockGenerate.mockReset();
-  mockRender.mockReset();
   mockGetSession.mockReset();
   mockHeaders.mockReset();
 });
@@ -120,20 +104,18 @@ describe("POST /api/generate-slides", () => {
     const response = await POST(request);
     const payload = (await response.json()) as {
       markdown?: string;
-      html?: string;
-      css?: string;
     };
 
     expect(response.status).toBe(200);
     expect(mockGenerate).toHaveBeenCalledTimes(2);
     expect(mockGenerate.mock.calls[0]?.[1]).toContain(
-      "Create a Marp Markdown slide deck in Spanish"
+      "Create a Markdown slide deck in Spanish"
     );
     expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain(
       "All slide copy must be written in Spanish"
     );
-    expect(mockGenerate.mock.calls[0]?.[2]?.system).not.toContain("内容使用中文");
-    expect(mockGenerate.mock.calls[1]?.[2]?.system).not.toContain("内容使用中文");
+    expect(mockGenerate.mock.calls[0]?.[2]?.system).not.toContain("中文");
+    expect(mockGenerate.mock.calls[1]?.[2]?.system).not.toContain("中文");
     expect(mockGenerate.mock.calls[1]?.[2]?.system).toContain(
       "Hard requirement: output at least 6 slides."
     );
@@ -157,32 +139,9 @@ describe("POST /api/generate-slides", () => {
     });
   });
 
-  it("returns 502 when Marp rendering throws", async () => {
-    mockGenerate.mockResolvedValueOnce({
-      text: "```\n---\nmarp: true\n---\n\n# One\n\n---\n\n# Two\n\n---\n\n# Three\n\n---\n\n# Four\n\n---\n\n# Five\n\n---\n\n# Six\n```",
-      finishReason: "stop",
-    });
-    mockRender.mockImplementationOnce(() => {
-      throw new Error("render failed");
-    });
-
-    const request = new Request("http://localhost/api/generate-slides", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: "Create a deck" }),
-    });
-
-    const response = await POST(request);
-
-    expect(response.status).toBe(502);
-    await expect(response.json()).resolves.toEqual({
-      error: "Failed to render generated slides. Try again.",
-    });
-  });
-
   it("uses DEFAULT_TEMPLATE_VALUES when templateValues is absent", async () => {
     mockGenerate.mockResolvedValueOnce({
-      text: "---\nmarp: true\ntheme: default\npaginate: true\nstyle: |\n  section{}\n---\n\n# One\n\n---\n# Two\n\n---\n# Three\n\n---\n# Four\n\n---\n# Five\n\n---\n# Six",
+      text: "# One\n\n---\n\n# Two\n\n---\n\n# Three\n\n---\n\n# Four\n\n---\n\n# Five\n\n---\n\n# Six",
       finishReason: "stop",
     });
 
@@ -194,14 +153,13 @@ describe("POST /api/generate-slides", () => {
 
     const res = await POST(req);
     expect(res.status).toBe(200);
-    // CSS in the system prompt must come from buildDynamicStyle, not [GENERATE HEX]
-    expect(mockGenerate.mock.calls[0]?.[2]?.system).not.toContain("[GENERATE HEX]");
-    expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain("--color-primary:");
+    // The system prompt should contain hex color codes from the palette
+    expect(mockGenerate.mock.calls[0]?.[2]?.system).toContain("#06b6d4");
   });
 
-  it("injects templateValues CSS into the system prompt", async () => {
+  it("injects templateValues colors into the system prompt", async () => {
     mockGenerate.mockResolvedValueOnce({
-      text: "---\nmarp: true\ntheme: default\npaginate: true\nstyle: |\n  section{}\n---\n\n# One\n\n---\n# Two\n\n---\n# Three\n\n---\n# Four\n\n---\n# Five\n\n---\n# Six",
+      text: "# One\n\n---\n\n# Two\n\n---\n\n# Three\n\n---\n\n# Four\n\n---\n\n# Five\n\n---\n\n# Six",
       finishReason: "stop",
     });
 

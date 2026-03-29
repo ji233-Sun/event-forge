@@ -1,21 +1,8 @@
-import { buildDynamicStyle, type Palette } from "@/lib/slides/template/css-builder";
+import { resolvePalette, type Palette } from "@/lib/slides/template/css-builder";
 import { type TemplateValues } from "@/lib/slides/template/config";
 
-function optionToDataAttr(option: Record<string, unknown>): string {
-  return JSON.stringify(option).replace(/'/g, "&#39;");
-}
-
-function toMarpStyleDirective(style: string): string {
-  return style
-    .trim()
-    .split("\n")
-    .map((line) => `  ${line}`)
-    .join("\n");
-}
-
-export function generateMarpMarkdown(values: TemplateValues): string {
-  const { style, palette } = buildDynamicStyle(values);
-  const marpStyle = toMarpStyleDirective(style);
+export function generateSampleMarkdown(values: TemplateValues): string {
+  const palette = resolvePalette(values);
 
   const barOption = {
     color: [palette.primary, palette.secondary, palette.accent],
@@ -93,66 +80,65 @@ export function generateMarpMarkdown(values: TemplateValues): string {
     ],
   };
 
-  return `---
-marp: true
-theme: default
-paginate: true
-style: |
-${marpStyle}
----
+  return `# ${values.themeMode === "dark" ? "Future Launch Deck" : "Campaign Launch Blueprint"}
 
-<!-- _class: cover -->
-# ${values.themeMode === "dark" ? "Future Launch Deck" : "Campaign Launch Blueprint"}
-
-<p><strong>${values.primaryColor.toUpperCase()}</strong> accent + <strong>${values.bgStyle}</strong> background</p>
+**${values.primaryColor.toUpperCase()}** accent + **${values.bgStyle}** background
 
 ---
 
 ## Storyline / Content Slide
 
-<div class="two-col">
-  <div class="panel">
-    <h3>Core Narrative</h3>
-    <ul>
-      <li><strong>Audience:</strong> student + young professionals</li>
-      <li><strong>Promise:</strong> immersive event experience</li>
-      <li><strong>Goal:</strong> convert attention into ticket sales</li>
-    </ul>
-  </div>
-  <div class="panel">
-    <h3>Execution Beats</h3>
-    <div class="timeline-item"><strong>Week 1-2</strong>: Campaign setup</div>
-    <div class="timeline-item"><strong>Week 3-4</strong>: Influencer burst</div>
-    <div class="timeline-item"><strong>Week 5-6</strong>: Closing push</div>
-  </div>
-</div>
+- **Audience:** student + young professionals
+- **Promise:** immersive event experience
+- **Goal:** convert attention into ticket sales
+
+**Timeline:**
+
+- **Week 1-2:** Campaign setup
+- **Week 3-4:** Influencer burst
+- **Week 5-6:** Closing push
 
 ---
 
-## Chart Slide (ECharts)
-One sentence support: spend and demand trend are aligned with conversion goals.
+## Budget Breakdown
 
-<div class="chart-row">
-  <div id="chart-budget" class="echarts-chart" data-option='${optionToDataAttr(barOption)}'></div>
-  <div id="chart-mix" class="echarts-chart" data-option='${optionToDataAttr(donutOption)}'></div>
-</div>
+Spending allocation across event categories.
 
-<div id="chart-trend" class="echarts-chart" data-option='${optionToDataAttr(lineOption)}'></div>
+\`\`\`echarts
+${JSON.stringify(barOption)}
+\`\`\`
 
 ---
 
-## KPI Slide
+## Revenue Mix
 
-<div class="kpi-row">
-  <div class="kpi"><div class="label">Projected Reach</div><div class="value">120K</div></div>
-  <div class="kpi"><div class="label">Sponsor Leads</div><div class="value">48</div></div>
-  <div class="kpi"><div class="label">Expected ROI</div><div class="value">2.6x</div></div>
-</div>
+Revenue streams and contribution breakdown.
 
-<div class="panel">
-  <strong>Ready to ship:</strong> This template demonstrates Cover + Content + Chart + KPI layouts for rapid style iteration.
-</div>
-`;
+\`\`\`echarts
+${JSON.stringify(donutOption)}
+\`\`\`
+
+---
+
+## Registration Trend
+
+Weekly registration growth trajectory.
+
+\`\`\`echarts
+${JSON.stringify(lineOption)}
+\`\`\`
+
+---
+
+## KPI Overview
+
+| Metric | Value |
+|--------|-------|
+| Projected Reach | **120K** |
+| Sponsor Leads | **48** |
+| Expected ROI | **2.6x** |
+
+**Ready to ship:** This template demonstrates Cover + Content + Chart + KPI layouts for rapid style iteration.`;
 }
 
-export const buildSampleMarkdown = generateMarpMarkdown;
+export const buildSampleMarkdown = generateSampleMarkdown;
