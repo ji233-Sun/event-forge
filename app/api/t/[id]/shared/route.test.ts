@@ -15,13 +15,14 @@ vi.mock('@/lib/db/auth-schema', () => ({
   minitool: { id: 'id_col' },
   minitoolShared: { minitoolId: 'minitool_id_col' },
 }))
-vi.mock('drizzle-orm', () => ({ eq: vi.fn() }))
+vi.mock('drizzle-orm', () => ({ and: vi.fn(), eq: vi.fn() }))
 
 import { GET, PUT } from './route'
 
 describe('GET /api/t/[id]/shared', () => {
   afterEach(() => vi.clearAllMocks())
 
+  // Also covers isPublic=false: findFirst returns null for both "not found" and "not public" cases
   it('returns 404 when minitool not found', async () => {
     mockDb.query.minitool.findFirst.mockResolvedValue(null)
     const res = await GET(
@@ -65,6 +66,7 @@ describe('PUT /api/t/[id]/shared', () => {
     expect(res.status).toBe(400)
   })
 
+  // Also covers isPublic=false: findFirst returns null for both "not found" and "not public" cases
   it('returns 404 when minitool not found', async () => {
     mockDb.query.minitool.findFirst.mockResolvedValue(null)
     const res = await PUT(

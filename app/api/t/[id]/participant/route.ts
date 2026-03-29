@@ -14,7 +14,7 @@ export async function GET(
   }
 
   const tool = await db.query.minitool.findFirst({
-    where: eq(minitool.id, id),
+    where: and(eq(minitool.id, id), eq(minitool.isPublic, true)),
     columns: { id: true },
   })
   if (!tool) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -57,7 +57,7 @@ export async function PUT(
   }
 
   const tool = await db.query.minitool.findFirst({
-    where: eq(minitool.id, id),
+    where: and(eq(minitool.id, id), eq(minitool.isPublic, true)),
     columns: { id: true },
   })
   if (!tool) return Response.json({ error: 'Not found' }, { status: 404 })

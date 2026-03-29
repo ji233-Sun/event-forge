@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { minitool, minitoolShared } from '@/lib/db/auth-schema'
-import { eq } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 
 export async function GET(
   _request: Request,
@@ -9,7 +9,7 @@ export async function GET(
   const { id } = await params
 
   const tool = await db.query.minitool.findFirst({
-    where: eq(minitool.id, id),
+    where: and(eq(minitool.id, id), eq(minitool.isPublic, true)),
     columns: { id: true },
   })
   if (!tool) return Response.json({ error: 'Not found' }, { status: 404 })
@@ -45,7 +45,7 @@ export async function PUT(
   }
 
   const tool = await db.query.minitool.findFirst({
-    where: eq(minitool.id, id),
+    where: and(eq(minitool.id, id), eq(minitool.isPublic, true)),
     columns: { id: true },
   })
   if (!tool) return Response.json({ error: 'Not found' }, { status: 404 })
