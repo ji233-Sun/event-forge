@@ -390,12 +390,12 @@ export const minitoolRelations = relations(minitool, ({ one, many }) => ({
   user: one(user, { fields: [minitool.userId], references: [user.id] }),
   participants: many(minitoolParticipant),
   shared: one(minitoolShared, { fields: [minitool.id], references: [minitoolShared.minitoolId] }),
-}))
+}));
 
 export const minitoolParticipantRelations = relations(minitoolParticipant, ({ one }) => ({
   minitool: one(minitool, { fields: [minitoolParticipant.minitoolId], references: [minitool.id] }),
-}))
+}));
 
 export const minitoolSharedRelations = relations(minitoolShared, ({ one }) => ({
   minitool: one(minitool, { fields: [minitoolShared.minitoolId], references: [minitool.id] }),
-}))
+}));
