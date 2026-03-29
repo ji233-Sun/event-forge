@@ -13,7 +13,8 @@ export function createUseParticipantData(minitoolId: string, visitorId: string) 
         .then((r) => r.json())
         .then((j) => { setData((j.data as T) ?? null); setIsLoading(false) })
         .catch(() => setIsLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Empty dependency array is intentional: minitoolId and visitorId are captured
+    // from the factory closure at hook-creation time and never change during the hook's lifetime.
     }, [])
 
     const save = useCallback(async (newData: T) => {
@@ -23,7 +24,8 @@ export function createUseParticipantData(minitoolId: string, visitorId: string) 
         body: JSON.stringify({ visitorId, data: newData }),
       })
       setData(newData)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Empty dependency array is intentional: minitoolId and visitorId are captured
+    // from the factory closure at hook-creation time and never change during the hook's lifetime.
     }, [])
 
     return { data, isLoading, save }
@@ -41,7 +43,8 @@ export function createUseSharedData(minitoolId: string) {
         .then((r) => r.json())
         .then((j) => { setData((j.data as T) ?? null); setIsLoading(false) })
         .catch(() => setIsLoading(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Empty dependency array is intentional: minitoolId and visitorId are captured
+    // from the factory closure at hook-creation time and never change during the hook's lifetime.
     }, [])
 
     const save = useCallback(async (newData: T) => {
@@ -51,7 +54,8 @@ export function createUseSharedData(minitoolId: string) {
         body: JSON.stringify({ data: newData }),
       })
       setData(newData)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Empty dependency array is intentional: minitoolId and visitorId are captured
+    // from the factory closure at hook-creation time and never change during the hook's lifetime.
     }, [])
 
     return { data, isLoading, save }
@@ -61,22 +65,24 @@ export function createUseSharedData(minitoolId: string) {
 // Preview stubs: no-op, return null data, discard all writes
 export function createPreviewUseParticipantData() {
   return function useParticipantData<T = unknown>() {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const save = useCallback(async (_newData: T) => {}, [])
     return {
       data: null as T | null,
       isLoading: false,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      save: async (_newData: T) => {},
+      save,
     }
   }
 }
 
 export function createPreviewUseSharedData() {
   return function useSharedData<T = unknown>() {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const save = useCallback(async (_newData: T) => {}, [])
     return {
       data: null as T | null,
       isLoading: false,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      save: async (_newData: T) => {},
+      save,
     }
   }
 }

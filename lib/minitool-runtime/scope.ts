@@ -52,10 +52,12 @@ function createPreviewHelpers() {
   return {
     participant: {
       get: async () => null,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       set: async (_data: unknown) => {},
     },
     shared: {
       get: async () => null,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       set: async (_data: unknown) => {},
     },
     participants: {
