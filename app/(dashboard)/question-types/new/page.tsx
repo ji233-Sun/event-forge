@@ -289,6 +289,7 @@ export default function NewQuestionTypePage() {
                           value={previewValue}
                           onChange={setPreviewValue}
                           question={{ title: 'Preview Question', description: 'Test the interactivity below' }}
+                          onFixed={(fixedCode) => setResult((prev) => prev ? { ...prev, formCode: fixedCode } : prev)}
                         />
                       </CardContent>
                     </Card>
@@ -303,6 +304,7 @@ export default function NewQuestionTypePage() {
                             code={result.displayCode}
                             mode="display"
                             answer={previewValue}
+                            onFixed={(fixedCode) => setResult((prev) => prev ? { ...prev, displayCode: fixedCode } : prev)}
                           />
                         </div>
                       </CardContent>

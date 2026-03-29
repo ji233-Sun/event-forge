@@ -2,6 +2,7 @@
 
 import { LiveProvider, LivePreview, LiveError } from 'react-live'
 import { QUESTION_RUNTIME_SCOPE } from '@/lib/question-runtime/scope'
+import { LiveAutoFixer } from '@/components/live-auto-fixer'
 
 type Props = {
   code: string
@@ -10,6 +11,8 @@ type Props = {
   question?: { title: string; description: string | null }
   mode: 'form' | 'display'
   answer?: unknown
+  /** When provided, errors trigger AI auto-fix instead of displaying raw error text. */
+  onFixed?: (fixedCode: string) => void
 }
 
 // Ensure noInline code always ends with a render() call.
@@ -35,7 +38,7 @@ function stripModuleSyntax(code: string): string {
     .replace(/^\s*export\s+/gm, '')
 }
 
-export function CustomQuestionRenderer({ code, value, onChange, question, mode, answer }: Props) {
+export function CustomQuestionRenderer({ code, value, onChange, question, mode, answer, onFixed }: Props) {
   const scope = {
     ...QUESTION_RUNTIME_SCOPE,
     value: mode === 'form' ? value : undefined,
@@ -46,7 +49,11 @@ export function CustomQuestionRenderer({ code, value, onChange, question, mode, 
 
   return (
     <LiveProvider code={ensureRenderCall(code, mode)} scope={scope} noInline transformCode={stripModuleSyntax}>
-      <LiveError className="rounded-md bg-destructive/10 p-2 text-xs text-destructive font-mono" />
+      {onFixed ? (
+        <LiveAutoFixer originalCode={code} fixEndpoint="/api/fix-code" onFixed={onFixed} />
+      ) : (
+        <LiveError className="rounded-md bg-destructive/10 p-2 text-xs text-destructive font-mono" />
+      )}
       <LivePreview />
     </LiveProvider>
   )

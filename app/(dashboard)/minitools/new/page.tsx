@@ -222,6 +222,13 @@ export default function NewMinitoolPage() {
                       code={activeTab === 'audience' ? result.componentCode : result.hostCode}
                       minitoolId="preview"
                       mode={activeTab === 'audience' ? 'preview-audience' : 'preview-host'}
+                      onFixed={(fixedCode) => {
+                        if (activeTab === 'audience') {
+                          setResult((prev) => prev ? { ...prev, componentCode: fixedCode } : prev)
+                        } else {
+                          setResult((prev) => prev ? { ...prev, hostCode: fixedCode } : prev)
+                        }
+                      }}
                     />
                   </CardContent>
                 </Card>

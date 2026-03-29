@@ -19,22 +19,35 @@ COMPONENT RULES (applies to both formCode and displayCode):
 - NO import statements. All dependencies are pre-injected via scope.
 - Use noInline=true format: define the component function, then end with a render() call.
 - formCode component signature: function Component({ value, onChange, question }) {}
-  - value: current answer object (may be undefined on first render — always guard: value?.field ?? defaultValue)
+  - value: current answer object — may be UNDEFINED on first render, always guard every field access
+      BAD:  value.nickname          → crashes on first render
+      GOOD: (value && value.nickname) ? value.nickname : ''
   - onChange: call with a JSON-serializable object whenever the answer changes
-  - question: { title: string, description: string | null }
+  - question: may be undefined — ALWAYS guard before accessing any field
+      BAD:  question.title          → crashes when question is undefined
+      GOOD: question ? question.title : ''
+      GOOD: question && question.description ? question.description : null
 - displayCode component signature: function Display({ answer }) {}
   - answer: the saved answer object — may be undefined or null
   - ALWAYS guard at the top: if (!answer) return <p className="text-sm text-muted-foreground">No answer yet.</p>
   - render it clearly for statistics/results
 
 NULL SAFETY — MANDATORY:
-Every AI hook returns nullable state that starts as null. Failing to guard is a runtime crash.
+Every prop and AI hook state starts as null/undefined. Accessing any property without a guard is a runtime crash.
+
+Props:
+- BAD:  question.title                     → TypeError if question is undefined
+- GOOD: question ? question.title : ''
+- BAD:  value.nickname                     → TypeError if value is undefined
+- GOOD: (value && value.nickname) ? value.nickname : ''
+- BAD:  answer.score                       → TypeError if answer is undefined/null
+- GOOD: answer && answer.score != null ? answer.score : 0
+
+AI hook state (imageUrl, audioUrl, fileUrl all start as null):
 - BAD:  <audio src={audioUrl} />           → crashes when audioUrl is null
 - GOOD: {audioUrl && <audio controls src={audioUrl} className="w-full mt-2" />}
 - BAD:  <img src={imageUrl} />             → crashes when imageUrl is null
 - GOOD: {imageUrl && <img src={imageUrl} className="rounded-md" alt="generated" />}
-- BAD:  answer.title                       → crashes when answer is undefined
-- GOOD: answer?.title ?? 'Untitled'
 
 AVAILABLE IN SCOPE:
 React hooks: useState, useEffect, useRef, useCallback, useMemo
@@ -46,20 +59,33 @@ AI hooks (call inside the component — these are real React hooks):
       options: { systemPrompt?: string }
   - useImageGen()
       → { imageUrl: null|string, isGenerating: boolean, error: null|string, generate(prompt): Promise<null|string> }
-      generate() fires the request, sets imageUrl, and returns the URL string (or null on error).
-      Do NOT call .title or any property on the return value — it is a plain string or null.
+      generate() fires the request and ALSO returns the URL as a plain string (or null on error).
+      The returned value is a raw string — it has NO properties. Never call .url, .title, .src on it.
+      Read the image from the hook's imageUrl state, not from the generate() return value.
+      CORRECT pattern:
+        const { imageUrl, isGenerating, generate } = useImageGen()
+        // trigger: await generate('a portrait of Alice')
+        // render:  {imageUrl && <img src={imageUrl} className="rounded-md w-full" alt="generated" />}
+      WRONG — causes TypeError:
+        const result = await generate(prompt)
+        setUrl(result.url)    // CRASH: result is a string, not {url:...}
+        setUrl(result.title)  // CRASH: result is a string, not {title:...}
+
   - useMusicGen()
       → { audioUrl: null|string, isGenerating: boolean, error: null|string, generate(params): Promise<null|string> }
-      generate() fires the request, sets audioUrl, and returns the URL string (or null on error).
-      Do NOT call .title or any property on the return value — it is a plain string or null.
+      generate() fires the request and ALSO returns the URL as a plain string (or null on error).
+      The returned value is a raw string — it has NO properties. Never call .url, .title, .src on it.
+      Read the audio from the hook's audioUrl state, not from the generate() return value.
       params: { prompt: string, mood?: string, tempo?: string, instrumentation?: string }
-      Minimal correct usage:
+      CORRECT pattern:
         const { audioUrl, isGenerating, error, generate } = useMusicGen()
-        // call: await generate({ prompt: 'upbeat pop song for Alice' })
-        // render: {audioUrl && <audio controls src={audioUrl} className="w-full mt-2" />}
+        // trigger: await generate({ prompt: 'upbeat pop song for Alice' })
+        // render:  {audioUrl && <audio controls src={audioUrl} className="w-full mt-2" />}
+
   - useFileUpload(options)
       → { fileUrl: null|string, isUploading: boolean, error: null|string, upload(file): Promise<null|string> }
-      upload() fires the request, sets fileUrl, and returns the URL string (or null on error).
+      upload() fires the request and ALSO returns the URL as a plain string (or null on error).
+      Read the file URL from the hook's fileUrl state.
       options: { maxMb?: number }
 
 SYNTAX RULES — MANDATORY (code runs in a browser JS sandbox via react-live/Sucrase):
